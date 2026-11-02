@@ -1,0 +1,84 @@
+{
+  "id": "teste",
+  "versao": 1,
+  "cartas": [
+    {
+      "id": "t-pao-de-queijo", "categoria": "coisa", "resposta": "Pão de queijo",
+      "aliases": ["pao de queijo", "pãozinho de queijo"], "dificuldade": 1,
+      "dicas": [
+        "Costuma ser vendido por peso ou em saquinho nas padarias do país.",
+        "A lista de ingredientes é curta e simples.",
+        "É comum acompanhar uma bebida quente pela manhã.",
+        "Pode ser comprado congelado e assado em casa.",
+        "Na receita tradicional, não leva farinha de trigo.",
+        "A massa é elástica e puxa quando se morde.",
+        "O formato típico é uma bolinha dourada.",
+        "Por dentro é macio e meio oco.",
+        "Um dos ingredientes é um laticínio curado.",
+        "Outro ingrediente vem da mandioca.",
+        "Esse ingrediente da mandioca se chama polvilho.",
+        "Leva ovos e leite na massa.",
+        "É assado até ficar dourado por fora.",
+        "Tem origem associada ao interior do país.",
+        "É um símbolo da culinária mineira.",
+        "Pode ser recheado com requeijão ou goiabada.",
+        "É sempre lembrado junto com o café coado.",
+        "O estado que o tornou famoso é Minas Gerais.",
+        "O nome tem três palavras e a do meio é \"de\".",
+        "Tem \"queijo\" no nome."
+      ]
+    },
+    {
+      "id": "t-cristo-redentor", "categoria": "lugar", "resposta": "Cristo Redentor",
+      "aliases": ["cristo", "estátua do cristo redentor"], "dificuldade": 1,
+      "dicas": [
+        "É visitado todos os anos por milhões de turistas.",
+        "Fica em um ponto alto, acima de uma grande cidade.",
+        "Foi inaugurado no século 20, nos anos 1930.",
+        "Tem cerca de 38 metros de altura, contando o pedestal.",
+        "Foi construído com concreto armado.",
+        "É revestido por pequenos triângulos de pedra.",
+        "A pedra usada é chamada de pedra-sabão.",
+        "Já foi atingido por raios várias vezes.",
+        "Foi eleito uma das Novas Sete Maravilhas do Mundo, em 2007.",
+        "Para chegar lá é possível subir de trem.",
+        "Também dá para chegar de van, atravessando uma floresta.",
+        "Fica no alto de um morro chamado Corcovado.",
+        "A estátua tem os braços abertos.",
+        "Os braços formam uma cruz.",
+        "Representa uma figura religiosa muito conhecida.",
+        "Da vista de lá aparece o Pão de Açúcar.",
+        "Fica no Rio de Janeiro.",
+        "É um dos maiores cartões-postais do Brasil.",
+        "O nome fala de quem a estátua representa.",
+        "Seu nome começa com \"Cristo\"."
+      ]
+    },
+    {
+      "id": "t-santos-dumont", "categoria": "pessoa", "resposta": "Santos Dumont",
+      "aliases": ["alberto santos dumont", "santos-dumont"], "dificuldade": 1,
+      "dicas": [
+        "Nasceu em uma fazenda do interior, no século 19.",
+        "Era filho de um rico fazendeiro de café.",
+        "Mudou-se para a Europa ainda jovem.",
+        "Viveu boa parte da vida adulta em Paris.",
+        "Era conhecido pelo estilo elegante, com chapéu e colarinho alto.",
+        "Gostava de velocidade e de mecânica.",
+        "Começou construindo balões dirigíveis.",
+        "Em 1901 contornou uma famosa torre francesa com um dirigível.",
+        "Ganhou um prêmio importante por esse feito.",
+        "Popularizou o relógio de pulso, feito por um joalheiro amigo.",
+        "Doou parte do prêmio em dinheiro aos pobres de Paris.",
+        "Não patenteou muitas de suas invenções.",
+        "Construiu um avião chamado 14-Bis.",
+        "O 14-Bis voou em Paris em 1906.",
+        "O voo foi feito diante de uma multidão.",
+        "Muitos brasileiros o chamam de \"Pai da Aviação\".",
+        "Seu nome batiza um aeroporto do Rio de Janeiro.",
+        "O aeroporto do centro do Rio leva o nome dele.",
+        "O primeiro nome dele é Alberto.",
+        "É o brasileiro mais associado à invenção do avião."
+      ]
+    }
+  ]
+}
