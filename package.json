@@ -37,7 +37,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "test": "node --test \"src/game/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
   },
   "private": true
 }
