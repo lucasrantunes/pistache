@@ -1,19 +1,26 @@
 // Página da TV (só visualização). Abra no navegador da TV; ela mostra um código de 4 letras.
-// Layout provisório no quadro 1280 x 720 do sketch, escalado para a tela; a arte final vem na Fase 5.
-import { useEffect, useState } from 'react';
-import { Text, View, useWindowDimensions } from 'react-native';
+// Quadro de 1280 x 720 do sketch "piso de pedra", escalado para a tela. Pode abrir a qualquer momento,
+// inclusive com a partida em andamento: o celular reenvia o estado quando a TV pede.
+import { createElement, useEffect, useState } from 'react';
+import { Platform, Text, View, useWindowDimensions } from 'react-native';
 
-import { MAX_CLUES } from '@/game/board';
+import { MAX_CLUES, SPECIAL_SQUARES, rankRows } from '@/game';
+import type { SpecialKind } from '@/game';
 import { newRoomCode } from '@/realtime/code';
 import { joinRoom } from '@/realtime/room';
 import type { RoomStatus } from '@/realtime/room';
 import type { TvPlayer, TvView } from '@/realtime/view';
-import { TV_HEIGHT, TV_WIDTH, trackSpots } from '@/scene/track';
-import { C, F, pointsColor } from '@/ui/theme';
+import { FLOOR_TOP, TORCHES, floorStones } from '@/scene/floor';
+import { TV_HEIGHT, TV_WIDTH, trackCurve, trackSpots } from '@/scene/track';
+import { Medal } from '@/ui/kit';
+import { KIND_COLOR, RankingList, SpecialLegend } from '@/ui/ranking';
+import { C, F } from '@/ui/theme';
 
 const CODE_KEY = 'pistache:tv-code';
 const SPOTS = trackSpots();
-const BAD = [3, 9, 17, 23];
+const CURVE = trackCurve();
+const STONES = floorStones();
+const PATH_D = 'M' + CURVE.map((q) => `${q.x.toFixed(1)} ${q.y.toFixed(1)}`).join(' L');
 
 function loadCode(): string {
   try {
@@ -25,47 +32,82 @@ function loadCode(): string {
   return code;
 }
 
-const glass = { backgroundColor: 'rgba(150,120,240,0.15)', borderColor: C.line, borderWidth: 1 } as const;
-const bg = { backgroundColor: '#160f3e', backgroundImage: 'linear-gradient(180deg,#1f1554 0%,#160f3e 55%,#0f0a2b 100%)' } as object;
+// Estilos só da web (a TV roda no navegador).
+const web = (o: object) => o as object;
+const bg = web({ backgroundColor: C.bg });
+const abs = { position: 'absolute' } as const;
 
-function tileInfo(i: number) {
-  if (i === 0) return { label: 'SAÍDA', color: C.green, size: 58, small: true };
-  if (i === 25) return { label: 'FIM', color: C.yellow, size: 68, small: false };
-  if (BAD.includes(i)) return { label: '!', color: C.red, size: 58, small: false };
-  if (i === 6) return { label: 'x2', color: C.yellow, size: 58, small: false };
-  if (i === 13) return { label: '$', color: C.orange, size: 58, small: false };
-  if (i === 20) return { label: '»', color: C.lime, size: 58, small: false };
-  return { label: '', color: C.lavender, size: 58, small: false };
+const brand = (size: number, color: string = C.ink) => ({ fontFamily: F.brand, fontSize: size, color }) as const;
+
+// ---------- Cena do jogo ----------
+
+function Floor() {
+  return (
+    <>
+      {STONES.map((s, i) => (
+        <View key={i} style={[abs, web({ left: s.left, top: s.top, width: s.w, height: s.h, backgroundColor: s.fill, clipPath: s.clip })]} />
+      ))}
+      {Platform.OS === 'web'
+        ? createElement(
+            'svg',
+            { width: TV_WIDTH, height: TV_HEIGHT, viewBox: `0 0 ${TV_WIDTH} ${TV_HEIGHT}`, style: { position: 'absolute', left: 0, top: 0 }, 'aria-hidden': true },
+            createElement('path', { d: PATH_D, fill: 'none', stroke: '#0b0720', strokeOpacity: 0.55, strokeWidth: 104, strokeLinecap: 'round', strokeLinejoin: 'round' }),
+            createElement('path', { d: PATH_D, fill: 'none', stroke: '#2b1f5c', strokeWidth: 90, strokeLinecap: 'round', strokeLinejoin: 'round' }),
+            createElement('path', { d: PATH_D, fill: 'none', stroke: '#4d3d90', strokeWidth: 80, strokeDasharray: '54 5', strokeLinejoin: 'round' }),
+            createElement('path', { d: PATH_D, fill: 'none', stroke: '#5a49a6', strokeWidth: 42, strokeDasharray: '36 6', strokeDashoffset: 27, strokeLinejoin: 'round' }),
+          )
+        : null}
+      {TORCHES.map((t, i) => (
+        <View key={i}>
+          <View style={[abs, web({ left: t.x - 150, top: t.y - 150, width: 300, height: 300, borderRadius: 150, backgroundImage: 'radial-gradient(circle, rgba(255,143,61,0.38) 0%, rgba(255,143,61,0.12) 40%, rgba(255,143,61,0) 70%)' })]} />
+          <View style={[abs, { left: t.x - 15, top: t.y - 60, width: 30, height: 70 }]}>
+            <View style={[abs, { left: 3, bottom: 0, width: 24, height: 30, borderRadius: 6, backgroundColor: '#3a2f66', borderBottomWidth: 5, borderBottomColor: '#271e4d' }]} />
+            <View style={[abs, web({ left: 2, bottom: 26, width: 26, height: 40, borderRadius: '50% 50% 50% 50% / 62% 62% 38% 38%', backgroundImage: 'linear-gradient(180deg,#ffca4b 0%,#ff8f3d 60%,#ff5a3d 100%)' })]} />
+            <View style={[abs, web({ left: 9, bottom: 28, width: 12, height: 22, borderRadius: '50% 50% 50% 50% / 62% 62% 38% 38%', backgroundColor: '#fff3b8' })]} />
+          </View>
+        </View>
+      ))}
+      <View style={[abs, web({ left: 0, top: FLOOR_TOP, width: TV_WIDTH, height: TV_HEIGHT - FLOOR_TOP, backgroundImage: 'radial-gradient(ellipse at 50% 55%, rgba(19,13,47,0) 45%, rgba(19,13,47,0.72) 100%)', pointerEvents: 'none' })]} />
+      <View style={[abs, web({ left: 0, top: FLOOR_TOP, width: TV_WIDTH, height: 60, backgroundImage: 'linear-gradient(180deg, rgba(19,13,47,0.85), rgba(19,13,47,0))' })]} />
+    </>
+  );
 }
+
+const TILE: Record<SpecialKind, { bg: string; edge: string; text: string }> = {
+  bad: { bg: '#ff777b', edge: '#c24a52', text: '☠︎' },
+  dobro: { bg: '#ffca4b', edge: '#c79a22', text: 'x2' },
+  ladrao: { bg: '#ff8f3d', edge: '#c2601a', text: '$' },
+  turbo: { bg: '#b7f04a', edge: '#82b02a', text: '⚡︎' },
+};
 
 function Track({ view }: { view: TvView }) {
   const bySquare = new Map<number, TvPlayer[]>();
   view.players.forEach((p) => bySquare.set(p.square, [...(bySquare.get(p.square) ?? []), p]));
   return (
     <>
-      {SPOTS.map((s, i) => {
-        const t = tileInfo(i);
-        const special = t.label !== '' && i !== 0;
+      {SPOTS.slice(1).map((s, idx) => {
+        const sq = idx + 1;
+        const special = SPECIAL_SQUARES[sq];
+        const goal = sq === 25;
+        const t = special ? TILE[special] : goal ? { bg: '#ffca4b', edge: '#c79a22', text: '⚑' } : { bg: '#8470d6', edge: '#5646a6', text: '' };
         return (
-          <View key={i} style={{ position: 'absolute', left: s.x - t.size / 2, top: s.y - t.size / 2, width: t.size, height: t.size, borderRadius: t.size / 2, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: special || i === 0 ? t.color : 'rgba(196,176,255,0.45)', backgroundColor: special || i === 0 ? t.color + '33' : 'rgba(150,120,240,0.18)' }}>
-            {t.label ? <Text style={{ fontFamily: F.brand, fontSize: t.small ? 15 : 26, color: t.color }}>{t.label}</Text> : null}
+          <View key={sq} style={[abs, web({ left: s.x - 33, top: s.y - 25, width: 66, height: 50, borderRadius: 13, backgroundColor: t.bg, borderBottomWidth: 6, borderBottomColor: t.edge, alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.35)' })]}>
+            {t.text ? <Text style={brand(special === 'dobro' ? 28 : 30, C.dark)}>{t.text}</Text> : null}
           </View>
         );
       })}
+      <Text style={[abs, { left: SPOTS[0].x - 22, top: SPOTS[0].y + 30, fontFamily: F.heavy, fontSize: 14, color: C.muted }]}>SAÍDA</Text>
+      <Text style={[abs, brand(20, C.yellow), { left: SPOTS[25].x - 70, top: SPOTS[25].y + 30, width: 140, textAlign: 'center' }]}>META: {view.goal}</Text>
       {view.players.map((p) => {
         const s = SPOTS[p.square];
         const mates = bySquare.get(p.square) ?? [p];
-        const shift = (mates.indexOf(p) - (mates.length - 1) / 2) * 40;
-        const lead = p.id === view.leaderId;
+        const shift = (mates.indexOf(p) - (mates.length - 1) / 2) * 46;
         return (
-          <View key={p.id} style={{ position: 'absolute', left: s.x - 48 + shift, top: s.y + 14 - 104, width: 96, height: 104, alignItems: 'center', justifyContent: 'flex-end', gap: 3 }}>
-            {lead ? <Text style={{ fontSize: 24, color: C.yellow, marginBottom: -6 }}>♛</Text> : null}
-            <View style={{ minWidth: 76, paddingHorizontal: 10, paddingTop: 3, paddingBottom: 4, borderRadius: 14, backgroundColor: p.color, alignItems: 'center' }}>
-              <Text numberOfLines={1} style={{ fontFamily: F.brand, fontSize: 21, color: C.dark }}>{p.name}</Text>
-              <Text style={{ fontFamily: F.mono, fontWeight: '700', fontSize: 14, color: C.dark }}>{p.points} pts</Text>
-            </View>
-            <View style={{ width: lead ? 60 : 52, height: lead ? 60 : 52, borderRadius: 30, backgroundColor: p.color, borderWidth: 2.5, borderColor: lead ? C.yellow : '#fff', alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontFamily: F.brand, fontSize: 26, color: C.dark }}>{p.name.charAt(0).toUpperCase()}</Text>
+          <View key={p.id} style={[abs, { left: s.x - 50 + shift, top: s.y - 88, width: 100, alignItems: 'center', gap: 2 }]}>
+            <Medal name={p.name} color={p.color} size={51} leader={p.id === view.leaderId} sad={p.muted} />
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, paddingHorizontal: 12, paddingVertical: 2, borderRadius: 999, backgroundColor: C.bg, borderWidth: 2, borderColor: p.color }}>
+              <Text numberOfLines={1} style={brand(20)}>{p.name}</Text>
+              <Text style={brand(20, C.yellow)}>{p.points}</Text>
             </View>
           </View>
         );
@@ -74,108 +116,198 @@ function Track({ view }: { view: TvView }) {
   );
 }
 
-function Arena({ view }: { view: TvView }) {
+/** Orbe dos pontos em jogo: o anel dourado encolhe a cada dica; na revelação mostra a resposta (decisão 45). */
+function Orb({ view }: { view: TvView }) {
   const revealed = view.answer !== null;
-  const chip = (text: string, pos: object, key: string) => (
-    <View key={key} style={[{ position: 'absolute', paddingHorizontal: 13, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(183,156,255,0.5)', backgroundColor: 'rgba(183,156,255,0.14)', opacity: revealed ? 0.3 : 1 }, pos]}>
-      <Text style={{ fontFamily: F.ui, fontSize: 18, color: C.lavender }}>{text}</Text>
-    </View>
-  );
-  const positions = [
-    { left: '2.35%', top: '18.24%' }, { right: '2.94%', top: '44.12%' }, { left: '11.76%', bottom: '24.71%' },
-    { left: '60%', top: '32.94%' }, { left: '30%', top: '26.47%' },
-  ];
-  return (
-    <View style={{ position: 'absolute', left: 55, top: 300, width: 340, height: 340 }}>
-      {[0, 12.94, 25.88].map((inset, i) => (
-        <View key={i} style={{ position: 'absolute', left: `${inset}%`, right: `${inset}%`, top: `${inset}%`, bottom: `${inset}%`, borderRadius: 999, borderWidth: 1, borderColor: `rgba(196,176,255,${0.12 + i * 0.05})` }} />
-      ))}
-      {revealed ? (
-        <View style={{ position: 'absolute', left: 104, top: 104, width: 132, height: 132, borderRadius: 66, borderWidth: 1, borderColor: 'rgba(57,229,140,0.65)', backgroundColor: C.greenFill, alignItems: 'center', justifyContent: 'center', padding: 8 }}>
-          <Text style={{ fontFamily: F.heavy, fontSize: 24, color: C.green }}>✓</Text>
-          <Text numberOfLines={3} style={{ fontFamily: F.heavy, fontSize: 19, color: C.ink, textAlign: 'center', lineHeight: 21 }}>{view.answer}</Text>
-        </View>
-      ) : (
-        <View style={{ position: 'absolute', left: '35.88%', right: '35.88%', top: '35.88%', bottom: '35.88%', borderRadius: 999, borderWidth: 1, borderColor: 'rgba(183,156,255,0.4)', backgroundColor: 'rgba(183,156,255,0.14)', alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontFamily: F.heavy, fontSize: 40, color: C.lavender }}>?</Text>
-          <Text style={{ fontFamily: F.mono, fontSize: 11, letterSpacing: 3, color: C.muted }}>{view.category.toUpperCase()}</Text>
-        </View>
-      )}
-      {view.guesses.slice(-5).map((g, i) => chip(g, positions[i], `${i}-${g}`))}
-    </View>
-  );
-}
-
-function CluePanel({ view }: { view: TvView }) {
-  const revealed = view.answer !== null;
-  const winner = view.result?.winnerName;
-  const headline = view.phase === 'finished' ? 'Fim de jogo!'
-    : view.phase === 'noWinner' ? `Ninguém acertou. Era: ${view.answer}`
-    : revealed ? (winner ? `${winner} acertou na dica ${view.clue}!` : `Era: ${view.answer}`)
-    : view.clueText ?? '';
-  const stakeLabel = revealed ? 'GANHOU' : view.heard ? 'ACERTOU?' : 'VALE';
-  const stakeColor = revealed ? C.green : C.yellow;
-  const stakeValue = revealed ? `+${view.result?.gained ?? 0}` : String(view.points);
-  return (
-    <View style={[{ position: 'absolute', left: 36, top: 60, width: 1208, height: 150, borderRadius: 26, paddingHorizontal: 26, paddingVertical: 14, flexDirection: 'row', gap: 24 }, glass]}>
-      <View style={{ flex: 1, justifyContent: 'space-between' }}>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Text style={{ paddingHorizontal: 12, paddingVertical: 3, borderRadius: 10, overflow: 'hidden', backgroundColor: 'rgba(183,156,255,0.2)', color: '#d9ccff', fontFamily: F.mono, fontWeight: '700', fontSize: 16, letterSpacing: 1 }}>
-            {revealed ? `CARTA ${view.cardIndex + 1}/${view.total}` : `DICA ${view.clue}/${MAX_CLUES}`}
-          </Text>
-        </View>
-        <Text numberOfLines={2} style={{ fontFamily: F.heavy, fontSize: 40, lineHeight: 44, color: revealed ? C.green : C.ink }}>{headline}</Text>
-        <View style={{ flexDirection: 'row', gap: 4 }}>
-          {Array.from({ length: MAX_CLUES }, (_, i) => i + 1).map((v) => (
-            <View key={v} style={{ flex: 1, height: 10, borderRadius: 5, backgroundColor: !revealed && v <= view.points ? pointsColor(v) : 'rgba(196,176,255,0.14)' }} />
-          ))}
-        </View>
-      </View>
-      <View style={{ width: 210, paddingLeft: 24, borderLeftWidth: 1, borderLeftColor: C.line, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ fontFamily: F.mono, fontWeight: '700', fontSize: 15, letterSpacing: 4, color: revealed ? C.green : '#ffe08a' }}>{stakeLabel}</Text>
-        <Text style={{ fontFamily: F.brand, fontSize: 92, lineHeight: 96, color: stakeColor }}>{stakeValue}</Text>
-        <Text style={{ fontFamily: F.ui, fontSize: 15, color: C.muted }}>pontos</Text>
-      </View>
-    </View>
-  );
-}
-
-function Scene({ view, code }: { view: TvView; code: string }) {
-  const winners = view.players.filter((p) => view.winnerIds.includes(p.id)).map((p) => p.name).join(' e ');
+  const ring = 70 + 136 * (view.points / MAX_CLUES);
   return (
     <>
-      <View style={{ position: 'absolute', left: 36, top: 12, width: 1208, height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ fontFamily: F.brand, fontSize: 32, color: C.yellow }}>Pistache</Text>
-        {view.paused ? <Text style={{ fontFamily: F.mono, fontWeight: '700', fontSize: 18, letterSpacing: 3, color: C.orange }}>PAUSADO</Text> : null}
-        <Text style={{ fontFamily: F.mono, fontWeight: '700', fontSize: 16, letterSpacing: 3, color: C.muted }}>SALA {code}</Text>
-      </View>
-      <CluePanel view={view} />
-      <Arena view={view} />
-      <Track view={view} />
-      {view.result?.effectText ? (
-        <View style={[{ position: 'absolute', left: 430, top: 222, paddingHorizontal: 18, paddingVertical: 6, borderRadius: 16 }, glass]}>
-          <Text style={{ fontFamily: F.heavy, fontSize: 22, color: C.yellow }}>{view.result.effectText}</Text>
+      <View style={[abs, web({ left: 25, top: 360, width: 280, height: 280, borderRadius: 140, borderWidth: 10, borderColor: '#4d3d90', backgroundImage: 'radial-gradient(circle, #2f2558 0%, #1f1745 75%)', boxShadow: '0 0 0 5px #2b1f5c, 0 0 40px rgba(255,143,61,0.25)' })]} />
+      <View style={[abs, { left: 80, top: 415, width: 170, height: 170, borderRadius: 85, borderWidth: 3, borderColor: 'rgba(177,138,255,0.22)' }]} />
+      <View style={[abs, { left: 110, top: 445, width: 110, height: 110, borderRadius: 55, borderWidth: 3, borderColor: 'rgba(177,138,255,0.22)' }]} />
+      {revealed ? (
+        <View style={[abs, web({ left: 165 - 103, top: 500 - 103, width: 206, height: 206, borderRadius: 103, borderWidth: 6, borderColor: C.green, backgroundColor: 'rgba(50,227,151,0.14)', alignItems: 'center', justifyContent: 'center', padding: 14, boxShadow: '0 0 24px rgba(50,227,151,0.5)' })]}>
+          <Text style={brand(34, C.green)}>✓</Text>
+          <Text numberOfLines={3} style={[brand(view.answer!.length > 14 ? 24 : 30), { textAlign: 'center', lineHeight: view.answer!.length > 14 ? 26 : 32 }]}>{view.answer}</Text>
         </View>
-      ) : null}
-      {view.phase === 'finished' ? (
-        <View style={{ position: 'absolute', left: 0, top: 0, width: TV_WIDTH, height: TV_HEIGHT, backgroundColor: 'rgba(15,10,43,0.82)', alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontFamily: F.mono, fontSize: 22, letterSpacing: 6, color: C.muted }}>VENCEDOR</Text>
-          <Text style={{ fontFamily: F.brand, fontSize: 140, color: C.yellow }}>{winners || 'Empate'}</Text>
-        </View>
-      ) : null}
+      ) : (
+        <>
+          <View style={[abs, web({ left: 165 - ring / 2, top: 500 - ring / 2, width: ring, height: ring, borderRadius: ring / 2, borderWidth: 9, borderColor: C.yellow, boxShadow: '0 0 24px rgba(255,202,75,0.55), inset 0 0 18px rgba(255,202,75,0.25)' })]} />
+          <View style={[abs, { left: 40, top: 450, width: 250, alignItems: 'center' }]}>
+            <Text style={[brand(84, C.yellow), { lineHeight: 84 }]}>{view.points}</Text>
+            <Text style={{ fontFamily: F.heavy, fontSize: 18, color: C.muted }}>pontos em jogo</Text>
+          </View>
+        </>
+      )}
     </>
   );
 }
 
-function Waiting({ code, status }: { code: string; status: RoomStatus }) {
+function RoomBadge({ code }: { code: string }) {
   return (
-    <View style={{ position: 'absolute', left: 0, top: 0, width: TV_WIDTH, height: TV_HEIGHT, alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-      <Text style={{ fontFamily: F.brand, fontSize: 56, color: C.yellow }}>Pistache</Text>
-      <Text style={{ fontFamily: F.mono, fontSize: 22, letterSpacing: 6, color: C.muted, marginTop: 20 }}>CÓDIGO DA SALA</Text>
-      <Text style={{ fontFamily: F.brand, fontSize: 190, letterSpacing: 24, color: C.ink }}>{code}</Text>
-      <Text style={{ fontFamily: F.heavy, fontSize: 28, color: C.lavender, textAlign: 'center' }}>No celular: toque em “Ligar na TV” e digite este código.</Text>
-      <Text style={{ fontFamily: F.ui, fontSize: 18, color: status === 'error' ? C.red : C.muted, marginTop: 14 }}>
-        {status === 'ready' ? 'Aguardando o celular…' : status === 'error' ? 'Sem conexão. Tentando de novo…' : 'Conectando…'}
+    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingHorizontal: 16, paddingVertical: 4, borderRadius: 14, backgroundColor: C.panel, borderWidth: 2, borderColor: 'rgba(255,202,75,0.6)' }}>
+      <Text style={{ fontFamily: F.heavy, fontSize: 18, color: C.muted }}>Sala</Text>
+      <Text style={[brand(32, C.yellow), { letterSpacing: 3 }]}>{code}</Text>
+    </View>
+  );
+}
+
+function Header({ view, code }: { view: TvView; code: string }) {
+  const revealed = view.answer !== null;
+  const winner = view.result?.winnerName;
+  const headline = view.phase === 'noWinner' ? 'Ninguém acertou!'
+    : revealed ? (winner ? `${winner} acertou na dica ${view.clue}!` : 'Ninguém pontuou nesta carta')
+    : view.clueText ?? '';
+  const effect = revealed && view.result?.effectText ? `${winner}: ${view.result.effectText}` : '';
+  const bad = view.result?.effectText.startsWith('AZAR');
+  return (
+    <View style={[abs, web({ left: 0, top: 0, width: TV_WIDTH, height: FLOOR_TOP, paddingHorizontal: 32, paddingVertical: 20, gap: 12, backgroundImage: `linear-gradient(180deg, ${C.bg} 0%, ${C.bgTop} 100%)` })]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+          <Text style={brand(40)}>{revealed ? `Carta ${view.cardIndex + 1}` : `Dica ${view.clue}`}<Text style={brand(28, C.muted)}>{revealed ? '' : ` / ${MAX_CLUES}`}</Text></Text>
+          <View style={{ paddingHorizontal: 18, paddingVertical: 6, borderRadius: 999, borderWidth: 3, borderColor: C.lavender }}>
+            <Text style={{ fontFamily: F.heavy, fontSize: 20, color: C.lavender }}>{view.category}</Text>
+          </View>
+          {view.paused ? <Text style={{ fontFamily: F.heavy, fontSize: 20, letterSpacing: 3, color: C.orange }}>PAUSADO</Text> : null}
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+          <View style={{ width: 240, height: 16, borderRadius: 999, backgroundColor: C.track, overflow: 'hidden' }}>
+            <View style={{ width: `${revealed ? 0 : (view.points / MAX_CLUES) * 100}%`, height: '100%', borderRadius: 999, backgroundColor: C.yellow }} />
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingHorizontal: 22, paddingVertical: 6, borderRadius: 999, backgroundColor: revealed ? C.green : C.yellow }}>
+            <Text style={brand(40, C.dark)}>{revealed ? `+${view.result?.gained ?? 0}` : view.points}</Text>
+            <Text style={{ fontFamily: F.heavy, fontSize: 20, color: C.dark }}>{revealed ? 'pontos' : view.heard ? 'acertou?' : 'pontos em jogo'}</Text>
+          </View>
+          <RoomBadge code={code} />
+        </View>
+      </View>
+      <View style={{ flex: 1, minHeight: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, borderRadius: 28, backgroundColor: C.panel, borderWidth: 3, borderColor: 'rgba(177,138,255,0.4)' }}>
+        <Text numberOfLines={revealed && effect ? 1 : 2} style={{ fontFamily: F.heavy, fontSize: revealed ? 44 : 44, lineHeight: 52, textAlign: 'center', color: revealed ? C.green : C.ink }}>{headline}</Text>
+        {effect ? <Text numberOfLines={1} style={{ fontFamily: F.heavy, fontSize: 26, color: bad ? C.red : C.yellow, marginTop: 2 }}>{effect}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+function PlayScene({ view, code }: { view: TvView; code: string }) {
+  return (
+    <>
+      <Floor />
+      <Orb view={view} />
+      <Track view={view} />
+      <Header view={view} code={code} />
+    </>
+  );
+}
+
+// ---------- Placar depois de cada carta ----------
+
+function RankingScene({ view, code }: { view: TvView; code: string }) {
+  const rows = rankRows(
+    view.players.map((p) => ({ id: p.id, name: p.name, points: p.points })),
+    Object.fromEntries(view.players.map((p) => [p.id, p.prevPoints])),
+    view.goal,
+  );
+  const order = view.players.map((p) => p.id);
+  const two = rows.length > 5;
+  const k = rows.length <= 4 ? 1.3 : two ? 1 : 1.1;
+  const half = Math.ceil(rows.length / 2);
+  return (
+    <View style={[abs, { left: 0, top: 0, width: TV_WIDTH, height: TV_HEIGHT, paddingHorizontal: 48, paddingTop: 28, gap: 14 }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 24 }}>
+          <Text style={brand(64)}>Placar</Text>
+          <Text style={{ fontFamily: F.heavy, fontSize: 28, color: C.green }}>Era: {view.answer}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <View style={{ paddingHorizontal: 20, paddingVertical: 8, borderRadius: 999, borderWidth: 3, borderColor: C.lavender }}>
+            <Text style={{ fontFamily: F.heavy, fontSize: 22, color: C.lavender }}>Carta {view.cardIndex + 1} concluída</Text>
+          </View>
+          <View style={{ paddingHorizontal: 20, paddingVertical: 6, borderRadius: 999, backgroundColor: C.yellow }}>
+            <Text style={brand(26, C.dark)}>⚑ Meta: {view.goal} pontos</Text>
+          </View>
+          <RoomBadge code={code} />
+        </View>
+      </View>
+      {two ? (
+        <View style={{ flexDirection: 'row', gap: 24 }}>
+          <View style={{ flex: 1 }}><RankingList rows={rows.slice(0, half)} order={order} goal={view.goal} k={k} /></View>
+          <View style={{ flex: 1 }}><RankingList rows={rows.slice(half)} order={order} goal={view.goal} k={k} /></View>
+        </View>
+      ) : (
+        <RankingList rows={rows} order={order} goal={view.goal} k={k} />
+      )}
+      <SpecialLegend k={1.4} />
+      <Text style={{ fontFamily: F.ui, fontSize: 20, color: C.muted, textAlign: 'center' }}>
+        {view.tiebreak ? 'Empate na meta! Vem uma carta de desempate.' : 'Aguardando a próxima carta…'}
+      </Text>
+    </View>
+  );
+}
+
+// ---------- Vencedor ----------
+
+function FinalScene({ view, code }: { view: TvView; code: string }) {
+  const winners = view.players.filter((p) => view.winnerIds.includes(p.id));
+  const sorted = [...view.players].sort((a, b) => b.points - a.points);
+  return (
+    <View style={[abs, web({ left: 0, top: 0, width: TV_WIDTH, height: TV_HEIGHT, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundImage: 'radial-gradient(circle at 50% 40%, #2b1f5c 0%, #130d2f 70%)' })]}>
+      <View style={[abs, { right: 32, top: 20 }]}><RoomBadge code={code} /></View>
+      <Text style={{ fontFamily: F.heavy, fontSize: 24, letterSpacing: 8, color: C.muted }}>FIM DE JOGO</Text>
+      <View style={{ flexDirection: 'row', gap: 20, paddingTop: 36 }}>
+        {winners.map((w) => <Medal key={w.id} name={w.name} color={w.color} size={190} leader />)}
+      </View>
+      <Text numberOfLines={1} style={brand(winners.length > 1 ? 84 : 120, C.yellow)}>
+        {winners.length ? `${winners.map((w) => w.name).join(' e ')} ${winners.length > 1 ? 'venceram' : 'venceu'}!` : 'Empate!'}
+      </Text>
+      <View style={{ flexDirection: 'row', gap: 26, marginTop: 24, flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 60 }}>
+        {sorted.map((p) => (
+          <View key={p.id} style={{ alignItems: 'center', gap: 4 }}>
+            <Medal name={p.name} color={p.color} size={60} />
+            <Text style={brand(24)}>{p.name}</Text>
+            <Text style={brand(26, C.yellow)}>{p.points}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ---------- Sala de espera ----------
+
+function Waiting({ code, status }: { code: string; status: RoomStatus }) {
+  const steps = ['Abra o Pistache', 'Toque em “Conectar TV”', 'Digite o código ao lado'];
+  return (
+    <View style={[abs, { left: 0, top: 0, width: TV_WIDTH, height: TV_HEIGHT, alignItems: 'center', justifyContent: 'center', gap: 6 }]}>
+      <Text style={brand(64, C.yellow)}>Pistache</Text>
+      <Text style={{ fontFamily: F.heavy, fontSize: 26, color: C.muted }}>Conecte o seu aparelho para começar</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 70, marginTop: 28 }}>
+        <View style={{ gap: 18 }}>
+          {steps.map((s, i) => (
+            <View key={s} style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+              <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: C.lavender, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={brand(26, C.dark)}>{i + 1}</Text>
+              </View>
+              <Text style={{ fontFamily: F.heavy, fontSize: 30, color: C.ink }}>{s}</Text>
+            </View>
+          ))}
+        </View>
+        <View style={{ alignItems: 'center', gap: 10 }}>
+          <Text style={{ fontFamily: F.mono, fontSize: 18, letterSpacing: 6, color: C.muted }}>CÓDIGO DA SALA</Text>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            {code.split('').map((ch, i) => (
+              <View key={i} style={{ width: 96, height: 120, borderRadius: 22, backgroundColor: C.panel, borderWidth: 3, borderColor: 'rgba(255,202,75,0.6)', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={brand(86, C.yellow)}>{ch}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </View>
+      <Text style={{ fontFamily: F.ui, fontSize: 22, color: status === 'error' ? C.red : C.lavender, marginTop: 30 }}>
+        {status === 'error' ? 'Sem conexão. Tentando de novo…' : status === 'ready' ? 'Esperando conexão…' : 'Conectando…'}
+      </Text>
+      <Text style={{ fontFamily: F.ui, fontSize: 18, color: C.muted, textAlign: 'center', width: 760, marginTop: 8 }}>
+        Esta tela só mostra o jogo, e dá para entrar a qualquer momento, até com a partida em andamento.
       </Text>
     </View>
   );
@@ -201,10 +333,14 @@ export default function Tv() {
     return () => { clearInterval(id); room.leave(); };
   }, [code]);
 
+  const screen = view?.screen ?? 'round';
   return (
     <View style={[{ flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, bg]}>
-      <View style={{ width: TV_WIDTH, height: TV_HEIGHT, transform: [{ scale }] }}>
-        {view ? <Scene view={view} code={code} /> : <Waiting code={code} status={status} />}
+      <View style={web({ width: TV_WIDTH, height: TV_HEIGHT, transform: [{ scale }], overflow: 'hidden' })}>
+        {!view ? <Waiting code={code} status={status} />
+          : screen === 'ranking' ? <RankingScene view={view} code={code} />
+          : screen === 'final' ? <FinalScene view={view} code={code} />
+          : <PlayScene view={view} code={code} />}
       </View>
     </View>
   );

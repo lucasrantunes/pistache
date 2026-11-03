@@ -1,12 +1,11 @@
-// Trilha em S da TV (coordenadas do sketch, quadro de 1280 x 720). Dados, não arte:
+// Trilha sinuosa da TV (coordenadas do sketch "piso de pedra", quadro de 1280 x 720). Dados, não arte:
 // a cena final troca só o desenho. A curva é suave (Catmull-Rom) e as 26 casas ficam a distâncias iguais.
 export const TV_WIDTH = 1280;
 export const TV_HEIGHT = 720;
 
 const CONTROL: [number, number][] = [
-  [490, 645], [780, 645], [1060, 645], [1150, 628], [1176, 572], [1146, 520], [1080, 500],
-  [800, 500], [560, 500], [490, 478], [468, 428], [490, 380], [560, 355],
-  [820, 355], [1080, 355], [1170, 336],
+  [330, 655], [520, 676], [760, 650], [980, 664], [1130, 620], [1196, 540], [1130, 478], [960, 486],
+  [780, 512], [600, 498], [470, 452], [458, 392], [560, 356], [740, 356], [930, 366], [1090, 358], [1190, 346],
 ];
 
 export type Point = { x: number; y: number };
@@ -30,7 +29,7 @@ export function trackCurve(): Point[] {
   return dense;
 }
 
-/** As 26 casas (0 = saída, 25 = chegada), a distâncias iguais ao longo da curva. */
+/** As 26 posições (0 = saída, 1 a 25 = casas, 25 = chegada), a distâncias iguais ao longo da curva. */
 export function trackSpots(): Point[] {
   const dense = trackCurve();
   const cum = [0];

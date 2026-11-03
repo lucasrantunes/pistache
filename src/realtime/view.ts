@@ -13,7 +13,12 @@ export interface TvPlayer {
   doubleNext: boolean;
   muteNext: boolean;
   muted: boolean;
+  /** Pontos no início da carta (para o "+N" do placar). */
+  prevPoints: number;
 }
+
+/** Qual tela o celular está mostrando agora; a TV acompanha. */
+export type TvScreen = 'round' | 'effect' | 'ranking' | 'final';
 
 export interface TvResult {
   winnerId: string | null;
@@ -43,9 +48,18 @@ export interface TvView {
   result: TvResult | null;
   tiebreak: boolean;
   winnerIds: string[];
+  /** Acrescentado no layout novo; TVs antigas ignoram. */
+  screen?: TvScreen;
 }
 
-export type ViewExtras = { paused: boolean; heard: boolean; guesses: string[]; colors: string[] };
+export type ViewExtras = {
+  paused: boolean;
+  heard: boolean;
+  guesses: string[];
+  colors: string[];
+  startPoints?: Record<string, number>;
+  screen?: TvScreen;
+};
 
 export function toView(state: GameState, extras: ViewExtras): TvView {
   const card = state.cards[state.cardIndex];
@@ -59,6 +73,7 @@ export function toView(state: GameState, extras: ViewExtras): TvView {
     doubleNext: p.doubleNext,
     muteNext: p.muteNext,
     muted: state.muted.includes(p.id),
+    prevPoints: extras.startPoints?.[p.id] ?? p.points,
   }));
   const top = Math.max(0, ...players.map((p) => p.points));
   const leaders = players.filter((p) => p.points === top);
@@ -91,5 +106,6 @@ export function toView(state: GameState, extras: ViewExtras): TvView {
       : null,
     tiebreak: state.tiebreakIds !== null,
     winnerIds: state.winnerIds,
+    screen: extras.screen ?? 'round',
   };
 }

@@ -25,17 +25,17 @@ export default function Inicio() {
   return (
     <Screen>
       <T font="brand" size={44} color={C.yellow} style={{ textAlign: 'center', marginTop: 8 }}>Pistache</T>
-      <T color={C.muted} style={{ textAlign: 'center' }}>Ouça as dicas e acerte o quanto antes.</T>
+      <T color={C.muted} style={{ textAlign: 'center' }}>Um celular, todo mundo gritando chutes.</T>
 
       <Glass style={{ gap: 10 }}>
-        <T font="mono" size={13} color={C.muted} style={{ letterSpacing: 2 }}>JOGADORES ({MIN_PLAYERS} A {MAX_PLAYERS})</T>
+        <T font="mono" size={13} color={C.muted} style={{ letterSpacing: 2 }}>QUEM VAI JOGAR? {filled.length} DE {MAX_PLAYERS}</T>
         {names.map((n, i) => (
           <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Medal name={n || String(i + 1)} color={PLAYER_COLORS[i % PLAYER_COLORS.length]} size={40} />
             <TextInput
               value={n}
               onChangeText={(v) => setName(i, v)}
-              placeholder={`Jogador ${i + 1}`}
+              placeholder={`Nome do jogador ${i + 1}`}
               placeholderTextColor="rgba(184,171,220,0.6)"
               maxLength={12}
               style={{ flex: 1, height: 48, borderRadius: 14, paddingHorizontal: 14, color: C.ink, fontFamily: F.heavy, fontSize: 18, backgroundColor: 'rgba(150,120,240,0.12)', borderWidth: 1, borderColor: C.line }}
@@ -51,7 +51,7 @@ export default function Inicio() {
       </Glass>
 
       <Glass style={{ gap: 10 }}>
-        <T font="mono" size={13} color={C.muted} style={{ letterSpacing: 2 }}>META DE PONTOS</T>
+        <T font="mono" size={13} color={C.muted} style={{ letterSpacing: 2 }}>VENCE QUEM CHEGAR A</T>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           {GOALS.map((g) => (
             <Pressable
@@ -62,11 +62,11 @@ export default function Inicio() {
             </Pressable>
           ))}
         </View>
-        <T size={13} color={C.muted}>Mais pontos, partida mais longa (50 leva cerca de 12 minutos).</T>
+        <T size={13} color={C.muted}>Mais pontos, partida mais longa (50 leva cerca de 12 minutos). Deixe o celular na mesa: o microfone só escuta durante a rodada e nada é gravado.</T>
       </Glass>
 
       <Glass style={{ gap: 10 }}>
-        <T font="mono" size={13} color={C.muted} style={{ letterSpacing: 2 }}>LIGAR NA TV (OPCIONAL)</T>
+        <T font="mono" size={13} color={C.muted} style={{ letterSpacing: 2 }}>CONECTAR TV (OPCIONAL)</T>
         <TextInput
           value={room}
           onChangeText={(v) => setRoom(normalizeCode(v))}
@@ -77,10 +77,10 @@ export default function Inicio() {
           maxLength={4}
           style={{ height: 56, borderRadius: 14, paddingHorizontal: 14, color: C.ink, fontFamily: F.brand, fontSize: 28, letterSpacing: 8, textAlign: 'center', backgroundColor: 'rgba(150,120,240,0.12)', borderWidth: 1, borderColor: room.length === 4 ? C.green : C.line }}
         />
-        <T size={13} color={C.muted}>Abra a página da TV no navegador dela e digite o código que aparece lá.</T>
+        <T size={13} color={C.muted}>Abra o Pistache na TV e digite o código que aparece lá. Dá para conectar depois também, com a partida rodando.</T>
       </Glass>
 
-      <Btn label="Começar" onPress={play} disabled={!ready} />
+      <Btn label="Começar partida" onPress={play} disabled={!ready} />
       {!ready ? <T size={13} color={C.muted} style={{ textAlign: 'center' }}>Escreva pelo menos {MIN_PLAYERS} nomes.</T> : null}
       <Link href="/voz" style={{ color: C.lavender, fontFamily: F.ui, textAlign: 'center', marginTop: 6 }}>Teste de voz</Link>
     </Screen>

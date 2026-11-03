@@ -6,7 +6,7 @@ export function effectText(e: Effect | null, players: Player[]): string {
   const name = (id?: string) => players.find((p) => p.id === id)?.name ?? '';
   switch (e.kind) {
     case 'lose3': return `AZAR: perdeu ${e.amount} pontos`;
-    case 'mute': return 'AZAR: fica mudo na próxima dica';
+    case 'mute': return 'AZAR: fica mudo na 1ª dica da próxima carta';
     case 'swapLast': return `AZAR: trocou de pontos com ${name(e.targetId)}`;
     case 'dobro': return 'BÔNUS Dobro: a próxima carta vale em dobro';
     case 'turbo': return `BÔNUS Turbo: +${e.amount} pontos`;
