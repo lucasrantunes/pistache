@@ -1,0 +1,44 @@
+[
+  {
+    "id": "pessoa",
+    "nome": "Pessoas",
+    "rotulo": "Pessoa",
+    "cor": "#ff9fc4"
+  },
+  {
+    "id": "lugar",
+    "nome": "Lugares",
+    "rotulo": "Lugar",
+    "cor": "#b18aff"
+  },
+  {
+    "id": "coisa",
+    "nome": "Coisas",
+    "rotulo": "Coisa",
+    "cor": "#ffca4b"
+  },
+  {
+    "id": "animal",
+    "nome": "Animais",
+    "rotulo": "Animal",
+    "cor": "#32e397"
+  },
+  {
+    "id": "comida",
+    "nome": "Comidas e bebidas",
+    "rotulo": "Comida",
+    "cor": "#ff8f3d"
+  },
+  {
+    "id": "esporte-musica",
+    "nome": "Esportes e música",
+    "rotulo": "Esporte/Música",
+    "cor": "#5cc8ff"
+  },
+  {
+    "id": "filme-serie",
+    "nome": "Filmes e séries",
+    "rotulo": "Filme/Série",
+    "cor": "#ff777b"
+  }
+]

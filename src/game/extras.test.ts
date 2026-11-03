@@ -21,3 +21,20 @@ test('embaralhar: mesma semente, mesma ordem; mantém todas as cartas', () => {
   assert.notDeepEqual(shuffle(cards, 1).map((c) => c.id), shuffle(cards, 2).map((c) => c.id));
   assert.deepEqual(cards.map((c) => c.id), ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7']);
 });
+
+import { buildDeck } from './deck.ts';
+
+const mk = (id: string, categoria: string) => ({ id, categoria, resposta: id, aliases: [], dicas: [], dificuldade: 1 as const });
+const pool = [mk('a1', 'a'), mk('a2', 'a'), mk('b1', 'b'), mk('c1', 'c')];
+
+test('baralho: só as categorias escolhidas (vazio = todas)', () => {
+  assert.deepEqual(buildDeck(pool, ['a'], 5).map((c) => c.id).sort(), ['a1', 'a2']);
+  assert.equal(buildDeck(pool, [], 5).length, 4);
+});
+
+test('baralho: cartas já jogadas vão para o fim, sem sumir', () => {
+  const deck = buildDeck(pool, [], 5, ['a1', 'b1']).map((c) => c.id);
+  assert.equal(deck.length, 4);
+  assert.deepEqual(deck.slice(0, 2).sort(), ['a2', 'c1']);
+  assert.deepEqual(deck.slice(2).sort(), ['a1', 'b1']);
+});

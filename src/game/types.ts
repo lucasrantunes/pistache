@@ -1,4 +1,5 @@
-export type Category = 'pessoa' | 'lugar' | 'coisa';
+/** Id de uma categoria. As categorias existem como dados em `src/content/categorias.json`. */
+export type Category = string;
 
 export interface Card {
   id: string;

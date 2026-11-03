@@ -9,7 +9,8 @@ Jogo de festa de adivinhação por dicas, para celular (iOS/Android) e TV. Idiom
 
 ## Estrutura
 - `src/game`: lógica pura (sem React), `reduce(estado, evento)`. Único lugar com testes automáticos.
-- `src/voice`, `src/realtime`, `src/scene`, `src/ui`, `src/content`: ainda vazios (fases 2 a 6).
+- `src/content`: categorias (`categorias.json`), pacotes de cartas (`packs/*.json`), validador e índice gerado. Para adicionar cartas ou categorias, siga `docs/Como-adicionar-cartas.md`.
+- `src/voice`, `src/realtime`, `src/scene`, `src/ui`: voz, sala em tempo real, cena da TV e telas.
 - `src/app`: telas do Expo Router. `tools/`: validador de cartas e scripts. `assets/`: sons e texturas.
 
 ## Convenções
@@ -20,6 +21,7 @@ Jogo de festa de adivinhação por dicas, para celular (iOS/Android) e TV. Idiom
 
 ## Comandos (Windows)
 - `npm test`: testes da lógica (`node:test`, Node 22.18+ roda TypeScript direto).
+- `npm run cartas:validar`: confere as cartas. `npm run cartas:indice`: refaz o índice depois de criar ou remover um pacote.
 - `npx tsc --noEmit`: tipos. `npx expo lint`: lint. `npx expo start`: rodar no Expo Go.
 - O `tsc` mostra 1 erro antigo em `src/components/app-tabs.web.tsx` (código do template, não nosso).
 

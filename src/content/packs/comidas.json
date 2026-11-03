@@ -1,0 +1,39 @@
+{
+  "id": "comidas",
+  "versao": 1,
+  "cartas": [
+    {
+      "id": "comida-brigadeiro",
+      "categoria": "comida",
+      "resposta": "Brigadeiro",
+      "aliases": [
+        "brigadeiros",
+        "brigadeiro de panela"
+      ],
+      "dificuldade": 1,
+      "dicas": [
+        "É presença certa em festas de aniversário no Brasil.",
+        "Costuma ser feito em casa e enrolado à mão.",
+        "A receita leva poucos ingredientes comuns.",
+        "Dá para fazer numa panela, mexendo sem parar.",
+        "Um dos ingredientes vem em lata ou caixinha.",
+        "Leva um pouco de manteiga.",
+        "Está no ponto quando a massa desgruda do fundo da panela.",
+        "Depois de pronto, precisa esfriar antes de enrolar.",
+        "As mãos são untadas para a massa não grudar.",
+        "Leva leite condensado.",
+        "Leva chocolate em pó ou achocolatado.",
+        "É enrolado em bolinhas.",
+        "As bolinhas costumam ser passadas em granulado de chocolate.",
+        "Cada bolinha costuma ficar numa forminha de papel.",
+        "Surgiu nos anos 1940.",
+        "O nome homenageia um militar que se candidatou à presidência em 1945.",
+        "Conta-se que foi criado durante uma campanha eleitoral.",
+        "Tem parentes como o beijinho, o de colher e as versões gourmet.",
+        "O nome é uma patente militar.",
+        "É o doce de chocolate mais famoso do Brasil e o nome começa com a letra B."
+      ],
+      "notas": "Exemplo para testar a estrutura; revisar os fatos antes do lançamento."
+    }
+  ]
+}

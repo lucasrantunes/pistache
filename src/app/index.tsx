@@ -3,24 +3,29 @@ import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 
+import { CARTAS, CATEGORIAS } from '@/content';
+import { categoriasDisponiveis } from '@/content/catalog';
 import { MAX_PLAYERS, MIN_PLAYERS } from '@/game';
 import { isValidCode, normalizeCode } from '@/realtime/code';
 import { Btn, Glass, Medal, Screen, T } from '@/ui/kit';
 import { C, F, PLAYER_COLORS } from '@/ui/theme';
 
 const GOALS = [30, 50, 70];
+const DISPONIVEIS = categoriasDisponiveis(CATEGORIAS, CARTAS);
 
 export default function Inicio() {
   const [names, setNames] = useState(['', '', '']);
   const [goal, setGoal] = useState(50);
   const [room, setRoom] = useState('');
+  const [cats, setCats] = useState<string[]>(DISPONIVEIS.map((c) => c.id));
   const filled = names.map((n) => n.trim()).filter(Boolean);
-  const ready = filled.length >= MIN_PLAYERS;
+  const ready = filled.length >= MIN_PLAYERS && cats.length > 0;
+  const toggleCat = (id: string) => setCats(cats.includes(id) ? cats.filter((c) => c !== id) : [...cats, id]);
 
   const setName = (i: number, v: string) => setNames(names.map((n, k) => (k === i ? v : n)));
 
   const play = () =>
-    router.push({ pathname: '/jogo', params: { names: JSON.stringify(filled), goal: String(goal), room: isValidCode(room) ? room : '' } } as never);
+    router.push({ pathname: '/jogo', params: { names: JSON.stringify(filled), goal: String(goal), cats: JSON.stringify(cats), room: isValidCode(room) ? room : '' } } as never);
 
   return (
     <Screen>
@@ -48,6 +53,26 @@ export default function Inicio() {
           </View>
         ))}
         {names.length < MAX_PLAYERS ? <Btn kind="ghost" label="+ Adicionar jogador" onPress={() => setNames([...names, ''])} /> : null}
+      </Glass>
+
+      <Glass style={{ gap: 10 }}>
+        <T font="mono" size={13} color={C.muted} style={{ letterSpacing: 2 }}>CATEGORIAS</T>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {DISPONIVEIS.map((c) => {
+            const on = cats.includes(c.id);
+            return (
+              <Pressable
+                key={c.id}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: on }}
+                onPress={() => toggleCat(c.id)}
+                style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: 2, borderColor: on ? c.cor : C.line, backgroundColor: on ? c.cor + '33' : 'transparent' }}>
+                <T font="heavy" size={15} color={on ? C.ink : C.muted}>{c.nome} · {c.total}</T>
+              </Pressable>
+            );
+          })}
+        </View>
+        <T size={13} color={C.muted}>{cats.length === 0 ? 'Escolha pelo menos uma categoria.' : 'As cartas das categorias marcadas se misturam na partida.'}</T>
       </Glass>
 
       <Glass style={{ gap: 10 }}>
@@ -81,7 +106,7 @@ export default function Inicio() {
       </Glass>
 
       <Btn label="Começar partida" onPress={play} disabled={!ready} />
-      {!ready ? <T size={13} color={C.muted} style={{ textAlign: 'center' }}>Escreva pelo menos {MIN_PLAYERS} nomes.</T> : null}
+      {filled.length < MIN_PLAYERS ? <T size={13} color={C.muted} style={{ textAlign: 'center' }}>Escreva pelo menos {MIN_PLAYERS} nomes.</T> : null}
       <Link href="/voz" style={{ color: C.lavender, fontFamily: F.ui, textAlign: 'center', marginTop: 6 }}>Teste de voz</Link>
     </Screen>
   );

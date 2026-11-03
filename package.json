@@ -43,7 +43,9 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "node --test \"src/**/*.test.ts\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "cartas:validar": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tools/validar-cartas.ts",
+    "cartas:indice": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tools/gerar-indice.ts"
   },
   "private": true
 }
