@@ -6,7 +6,7 @@
 - Respostas curtas; não reabrir decisões fechadas; perguntar uma coisa por vez; testes visuais/de toque ficam com o dono (instruções curtas), testes automáticos só para lógica pura.
 
 ## Etapa atual
-Etapas 1 a 11 planejadas (refino depois). Próximo: o dono aprova o plano e começa a Fase 0 do roteiro (decisões 49 a 66).
+Etapas 1 a 11 planejadas. **Fase 1 concluída** (núcleo com 15 testes + tela de texto testada no Expo Go, decisão 67). Fase 0 pendente: aprovar o sketch (v20) e criar conta Expo (token). **Próximo: Fase 2, protótipo de voz** (decisão 68).
 Modo de trabalho: o dono quer agrupar decisões pequenas com padrão sugerido e só parar nas decisões importantes.
 
 ## Decisões tomadas
@@ -101,7 +101,7 @@ Modo de trabalho: o dono quer agrupar decisões pequenas com padrão sugerido e 
 
 ### Etapa 7: arquitetura técnica (padrões assumidos)
 52. **App**: Expo (React Native) + TypeScript + Expo Router, em build de desenvolvimento (EAS). Animações com Reanimated e desenho com react-native-svg; Skia só se faltar desempenho.
-53. **Lógica do jogo em TypeScript puro**, sem tela: função `reduce(estado, evento)` com partida, rodada, dicas, pontos, tabuleiro, casas especiais e efeitos. Testes automáticos com Vitest. É o único lugar com testes automáticos pesados.
+53. **Lógica do jogo em TypeScript puro**, sem tela: função `reduce(estado, evento)` com partida, rodada, dicas, pontos, tabuleiro, casas especiais e efeitos. Testes automáticos com ~~Vitest~~ `node:test` do próprio Node (decisão 67). É o único lugar com testes automáticos pesados.
 54. **Voz**: captura do microfone por módulo nativo (candidatos: react-native-audio-api e @siteed/expo-audio-studio; escolher no protótipo da Fase 2), WebSocket direto com a Deepgram (Nova-3, pt-BR) usando token temporário. Filtro de silêncio portado do Pitaco. Palavra mágica ("Pistache", "Pistache, pausa") detectada nas transcrições parciais com comparação tolerante. Acerto: texto normalizado (sem acento ou pontuação), aliases da carta e distância pequena de erro (Levenshtein), só em palavras inteiras.
 55. **Servidor mínimo**: Supabase (plano gratuito) com uma Edge Function que emite o token da Deepgram (limite por aparelho e por dia) e Realtime Broadcast para a sala. Sem banco de dados e sem contas no MVP.
 56. **Sala em tempo real**: o operador cria uma sala com código de 4 letras e envia o estado completo (pequeno) a cada mudança; a TV entra pelo código e recebe. Se a TV entrar ou reconectar, o operador reenvia o estado. A resposta da carta só viaja para a TV na revelação.
@@ -180,3 +180,7 @@ Modo de trabalho: o dono quer agrupar decisões pequenas com padrão sugerido e 
 - Tempo real já no MVP (celular para TV): wifi ruim derruba a TV, mas o app continua funcionando sozinho no celular; precisa de reconexão automática e aviso na tela.
 - O microfone ficará aberto a partida inteira (o Pitaco só abre para palpites): o custo por partida é maior; o filtro de silêncio e o limite por aparelho são obrigatórios desde o MVP.
 - Código do Pitaco foi feito para chutes digitados/falados curtos; a escuta contínua da palavra mágica ("Pistache", "pausa") ainda não existe e precisa de teste real em festa.
+
+### Fase 1 e 2 (construção)
+67. **Fase 1 feita**: `src/game` (reduce, tabuleiro, efeitos, meta, desempate, sorteio com semente) com 15 testes; tela de texto em `src/app/index.tsx`; 3 cartas de teste em `src/content/packs/teste.json`. Testes com `node:test` (sem instalar nada; substitui o Vitest da decisão 53). Ladrão e Turbo não encadeiam outra casa; na carta de desempate não há efeito de casa; "mudo" vale na 1ª dica da próxima carta.
+68. **Fase 2 (protótipo de voz), padrão assumido**: captura com `react-native-audio-api` (`AudioRecorder.onAudioReady`, 16 kHz, mono, converter para Int16), build de desenvolvimento Android via EAS Free. Primeiro teste com a chave da Deepgram só no seu aparelho (arquivo `.env` local, fora do git); depois troca pelo token temporário da Edge Function do Supabase na mesma fase. Teste: falar "Pistache" e uma resposta e ver a detecção.

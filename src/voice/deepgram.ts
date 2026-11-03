@@ -16,7 +16,10 @@ export type DeepgramConnection = {
 
 const KEEP_ALIVE_MS = 4000;
 
-export function openDeepgram(apiKey: string, sampleRate: number, handlers: DeepgramHandlers): DeepgramConnection {
+/** Credencial: token temporário do servidor (padrão) ou chave direta (só para desenvolvimento). */
+export type DeepgramAuth = { kind: 'bearer' | 'key'; value: string };
+
+export function openDeepgram(auth: DeepgramAuth, sampleRate: number, handlers: DeepgramHandlers): DeepgramConnection {
   const params = new URLSearchParams({
     model: 'nova-3',
     language: 'pt-BR',
@@ -27,7 +30,7 @@ export function openDeepgram(apiKey: string, sampleRate: number, handlers: Deepg
     endpointing: '10',
     smart_format: 'false',
   });
-  const socket = new WebSocket(`wss://api.deepgram.com/v1/listen?${params.toString()}`, ['token', apiKey]);
+  const socket = new WebSocket(`wss://api.deepgram.com/v1/listen?${params.toString()}`, [auth.kind === 'bearer' ? 'bearer' : 'token', auth.value]);
   socket.binaryType = 'arraybuffer';
   let lastSent = Date.now();
   let keepAlive: ReturnType<typeof setInterval> | undefined;

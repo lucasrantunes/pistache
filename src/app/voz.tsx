@@ -7,7 +7,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import pack from '@/content/packs/teste.json';
 import { openDeepgram } from '@/voice/deepgram';
-import type { DeepgramConnection } from '@/voice/deepgram';
+import type { DeepgramAuth, DeepgramConnection } from '@/voice/deepgram';
+import { fetchVoiceToken, hasVoiceServer } from '@/voice/token';
 import { startMic } from '@/voice/mic';
 import type { Mic } from '@/voice/mic';
 import { detectCommand, matchesAnswer } from '@/voice/text';
@@ -63,8 +64,16 @@ export default function Voz() {
 
   const start = async () => {
     setError('');
-    if (!KEY) { setError('Falta a chave: EXPO_PUBLIC_DEEPGRAM_KEY no arquivo .env.local'); return; }
+    if (!KEY && !hasVoiceServer()) { setError('Falta configurar o .env.local (Supabase ou chave)'); return; }
     setStatus('conectando');
+    let auth: DeepgramAuth;
+    try {
+      auth = hasVoiceServer() ? { kind: 'bearer', value: await fetchVoiceToken() } : { kind: 'key', value: KEY };
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setStatus('parado');
+      return;
+    }
     sentSamples.current = 0;
     capturedSamples.current = 0;
     gate.current = new VoiceActivityGate();
@@ -76,7 +85,7 @@ export default function Voz() {
         onAudio: (pcm, sampleRate) => {
           if (!connection) {
             setRate(sampleRate);
-            connection = openDeepgram(KEY, sampleRate, {
+            connection = openDeepgram(auth, sampleRate, {
               onOpen: () => setStatus('ouvindo'),
               onTranscript,
               onClose: (r) => { setError(`Conexão ${r}`); void stop(); },
