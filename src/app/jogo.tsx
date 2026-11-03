@@ -7,26 +7,18 @@ import pack from '@/content/packs/teste.json';
 import {
   MAX_CLUES, cluePoints, createInitialState, currentCard, idleState, reduce, shuffle, squareOf,
 } from '@/game';
-import type { Card, Effect, GameState } from '@/game';
+import type { Card, GameState } from '@/game';
+import { effectText as describeEffect } from '@/game';
+import { joinRoom } from '@/realtime/room';
+import type { Room, RoomStatus } from '@/realtime/room';
+import { toView } from '@/realtime/view';
+import type { TvView } from '@/realtime/view';
 import { useVoiceSession } from '@/voice/session';
 import { detectCommand, matchesAnswer } from '@/voice/text';
 import { Btn, Glass, Medal, Pill, Screen, T } from '@/ui/kit';
 import { C, PLAYER_COLORS, pointsColor } from '@/ui/theme';
 
 const CARDS = pack.cartas as unknown as Card[];
-
-function effectText(e: Effect | null, s: GameState): string {
-  if (!e) return '';
-  const name = (id?: string) => s.players.find((p) => p.id === id)?.name ?? '';
-  switch (e.kind) {
-    case 'lose3': return `AZAR: perdeu ${e.amount} pontos`;
-    case 'mute': return 'AZAR: fica mudo na próxima dica (regra de honra)';
-    case 'swapLast': return `AZAR: trocou de pontos com ${name(e.targetId)}`;
-    case 'dobro': return 'BÔNUS Dobro: a próxima carta vale em dobro';
-    case 'turbo': return `BÔNUS Turbo: +${e.amount} pontos`;
-    case 'ladrao': return e.targetId ? `BÔNUS Ladrão: roubou ${e.amount} de ${name(e.targetId)}` : `BÔNUS Ladrão: ganhou ${e.amount} do banco`;
-  }
-}
 
 function PlayerGrid({ state, onPick }: { state: GameState; onPick: (id: string) => void }) {
   const eligible = state.players.filter((p) => !state.tiebreakIds || state.tiebreakIds.includes(p.id));
@@ -92,7 +84,7 @@ function PointsStrip({ points }: { points: number }) {
 }
 
 export default function Jogo() {
-  const params = useLocalSearchParams<{ names?: string; goal?: string }>();
+  const params = useLocalSearchParams<{ names?: string; goal?: string; room?: string }>();
   const [state, dispatch] = useReducer(reduce, params, (p) => {
     let names: string[] = [];
     try { names = JSON.parse(p.names ?? '[]'); } catch { /* sem nomes */ }
@@ -103,6 +95,11 @@ export default function Jogo() {
   const [paused, setPaused] = useState(false);
   const [heard, setHeard] = useState<string | null>(null);
   const [idleMs, setIdleMs] = useState(0);
+  const [guesses, setGuesses] = useState<string[]>([]);
+  const [tvStatus, setTvStatus] = useState<RoomStatus>('connecting');
+  const roomCode = params.room ?? '';
+  const room = useRef<Room | null>(null);
+  const viewRef = useRef<TvView | null>(null);
   const lastActivity = useRef(Date.now());
   const stateRef = useRef(state);
   const pausedRef = useRef(paused);
@@ -121,6 +118,7 @@ export default function Jogo() {
     }
     if (!isFinal) return;
     const cmd = detectCommand(text, pausedRef.current);
+    if (!cmd && text.trim().split(/\s+/).length <= 4) setGuesses((g) => [...g, text.trim().toLowerCase()].slice(-5));
     if (cmd === 'advance') dispatch({ type: 'NEXT_CLUE' });
     else if (cmd === 'pause') setPaused(true);
     else if (cmd === 'resume') { setPaused(false); lastActivity.current = Date.now(); }
@@ -149,6 +147,28 @@ export default function Jogo() {
     }, 500);
     return () => clearInterval(id);
   }, [state.phase, paused, state.clue]);
+
+  // Novo palpite zera a cada carta.
+  useEffect(() => { setGuesses([]); }, [state.cardIndex]);
+
+  // Sala da TV: entra no canal, reenvia o estado quando a TV pede.
+  useEffect(() => {
+    if (!roomCode) return;
+    const r = joinRoom(roomCode, {
+      onHello: () => { if (viewRef.current) r.sendState(viewRef.current); },
+      onStatus: (st) => { setTvStatus(st); if (st === 'ready' && viewRef.current) r.sendState(viewRef.current); },
+    });
+    room.current = r;
+    return () => { r.leave(); room.current = null; };
+  }, [roomCode]);
+
+  const view = toView(state, { paused, heard: heard !== null, guesses, colors: PLAYER_COLORS });
+  const viewJson = JSON.stringify(view);
+  useEffect(() => {
+    viewRef.current = view;
+    room.current?.sendState(view);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewJson]);
 
   const card = state.cards.length ? currentCard(state) : null;
   const points = cluePoints(state.clue);
@@ -181,7 +201,7 @@ export default function Jogo() {
     <Screen>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <T font="brand" size={28} color={C.yellow}>Pistache</T>
-        <Pill label={`CARTA ${state.cardIndex + 1}/${state.cards.length} · ${card.categoria.toUpperCase()}`} />
+        <Pill label={roomCode ? `TV ${roomCode}${tvStatus === 'ready' ? '' : ' …'}` : `CARTA ${state.cardIndex + 1}/${state.cards.length}`} />
         <Pressable accessibilityRole="button" onPress={() => router.replace('/')} style={{ padding: 8 }}>
           <T size={14} color={C.muted}>Sair</T>
         </Pressable>
@@ -255,7 +275,7 @@ export default function Jogo() {
                 {state.players.find((p) => p.id === state.lastResult!.winnerId)?.name} ganhou +{state.lastResult.gained} pontos
               </T>
             ) : <T size={16}>Ninguém pontuou.</T>}
-            {state.lastResult.effect ? <T font="heavy" size={17} color={C.yellow}>{effectText(state.lastResult.effect, state)}</T> : null}
+            {state.lastResult.effect ? <T font="heavy" size={17} color={C.yellow}>{describeEffect(state.lastResult.effect, state.players)}</T> : null}
             {state.tiebreakIds ? <T font="heavy" size={16} color={C.orange}>Empate na meta! Vem uma carta de desempate.</T> : null}
           </Glass>
           <Board state={state} />

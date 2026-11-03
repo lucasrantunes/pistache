@@ -4,3 +4,4 @@ export * from './rng.ts';
 export * from './types.ts';
 export * from './deck.ts';
 export * from './idle.ts';
+export * from './describe.ts';

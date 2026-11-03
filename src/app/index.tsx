@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 
 import { MAX_PLAYERS, MIN_PLAYERS } from '@/game';
+import { isValidCode, normalizeCode } from '@/realtime/code';
 import { Btn, Glass, Medal, Screen, T } from '@/ui/kit';
 import { C, F, PLAYER_COLORS } from '@/ui/theme';
 
@@ -12,13 +13,14 @@ const GOALS = [30, 50, 70];
 export default function Inicio() {
   const [names, setNames] = useState(['', '', '']);
   const [goal, setGoal] = useState(50);
+  const [room, setRoom] = useState('');
   const filled = names.map((n) => n.trim()).filter(Boolean);
   const ready = filled.length >= MIN_PLAYERS;
 
   const setName = (i: number, v: string) => setNames(names.map((n, k) => (k === i ? v : n)));
 
   const play = () =>
-    router.push({ pathname: '/jogo', params: { names: JSON.stringify(filled), goal: String(goal) } } as never);
+    router.push({ pathname: '/jogo', params: { names: JSON.stringify(filled), goal: String(goal), room: isValidCode(room) ? room : '' } } as never);
 
   return (
     <Screen>
@@ -61,6 +63,21 @@ export default function Inicio() {
           ))}
         </View>
         <T size={13} color={C.muted}>Mais pontos, partida mais longa (50 leva cerca de 12 minutos).</T>
+      </Glass>
+
+      <Glass style={{ gap: 10 }}>
+        <T font="mono" size={13} color={C.muted} style={{ letterSpacing: 2 }}>LIGAR NA TV (OPCIONAL)</T>
+        <TextInput
+          value={room}
+          onChangeText={(v) => setRoom(normalizeCode(v))}
+          placeholder="Código da TV"
+          placeholderTextColor="rgba(184,171,220,0.6)"
+          autoCapitalize="characters"
+          autoCorrect={false}
+          maxLength={4}
+          style={{ height: 56, borderRadius: 14, paddingHorizontal: 14, color: C.ink, fontFamily: F.brand, fontSize: 28, letterSpacing: 8, textAlign: 'center', backgroundColor: 'rgba(150,120,240,0.12)', borderWidth: 1, borderColor: room.length === 4 ? C.green : C.line }}
+        />
+        <T size={13} color={C.muted}>Abra a página da TV no navegador dela e digite o código que aparece lá.</T>
       </Glass>
 
       <Btn label="Começar" onPress={play} disabled={!ready} />

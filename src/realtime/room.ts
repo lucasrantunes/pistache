@@ -1,0 +1,62 @@
+// Sala em tempo real (Supabase Realtime, canal "broadcast"): o celular envia o estado, a TV recebe.
+import { createClient } from '@supabase/supabase-js';
+
+import type { TvView } from './view';
+
+const URL_BASE = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+
+let client: ReturnType<typeof createClient> | null = null;
+function getClient() {
+  if (!client) {
+    client = createClient(URL_BASE, ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      realtime: { params: { eventsPerSecond: 10 } },
+    });
+  }
+  return client;
+}
+
+export type RoomStatus = 'connecting' | 'ready' | 'error';
+
+export type RoomHandlers = {
+  onState?: (view: TvView) => void;
+  /** A TV entrou (ou recarregou) e quer o estado atual. */
+  onHello?: () => void;
+  onStatus?: (status: RoomStatus) => void;
+};
+
+export type Room = {
+  sendState: (view: TvView) => void;
+  sendHello: () => void;
+  leave: () => void;
+};
+
+export function joinRoom(code: string, handlers: RoomHandlers): Room {
+  const supabase = getClient();
+  const channel = supabase.channel(`pistache:${code}`, { config: { broadcast: { self: false } } });
+  let ready = false;
+  channel.on('broadcast', { event: 'state' }, ({ payload }) => handlers.onState?.(payload as TvView));
+  channel.on('broadcast', { event: 'hello' }, () => handlers.onHello?.());
+  handlers.onStatus?.('connecting');
+  channel.subscribe((status) => {
+    if (status === 'SUBSCRIBED') {
+      ready = true;
+      handlers.onStatus?.('ready');
+    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+      ready = false;
+      handlers.onStatus?.('error');
+    }
+  });
+  return {
+    sendState: (view) => {
+      if (ready) void channel.send({ type: 'broadcast', event: 'state', payload: view });
+    },
+    sendHello: () => {
+      if (ready) void channel.send({ type: 'broadcast', event: 'hello', payload: {} });
+    },
+    leave: () => {
+      void supabase.removeChannel(channel);
+    },
+  };
+}
