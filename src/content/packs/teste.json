@@ -3,34 +3,14 @@
   "versao": 1,
   "cartas": [
     {
-      "id": "t-pao-de-queijo", "categoria": "coisa", "resposta": "Pão de queijo",
-      "aliases": ["pao de queijo", "pãozinho de queijo"], "dificuldade": 1,
-      "dicas": [
-        "Costuma ser vendido por peso ou em saquinho nas padarias do país.",
-        "A lista de ingredientes é curta e simples.",
-        "É comum acompanhar uma bebida quente pela manhã.",
-        "Pode ser comprado congelado e assado em casa.",
-        "Na receita tradicional, não leva farinha de trigo.",
-        "A massa é elástica e puxa quando se morde.",
-        "O formato típico é uma bolinha dourada.",
-        "Por dentro é macio e meio oco.",
-        "Um dos ingredientes é um laticínio curado.",
-        "Outro ingrediente vem da mandioca.",
-        "Esse ingrediente da mandioca se chama polvilho.",
-        "Leva ovos e leite na massa.",
-        "É assado até ficar dourado por fora.",
-        "Tem origem associada ao interior do país.",
-        "É um símbolo da culinária mineira.",
-        "Pode ser recheado com requeijão ou goiabada.",
-        "É sempre lembrado junto com o café coado.",
-        "O estado que o tornou famoso é Minas Gerais.",
-        "O nome tem três palavras e a do meio é \"de\".",
-        "Tem \"queijo\" no nome."
-      ]
-    },
-    {
-      "id": "t-cristo-redentor", "categoria": "lugar", "resposta": "Cristo Redentor",
-      "aliases": ["cristo", "estátua do cristo redentor"], "dificuldade": 1,
+      "id": "t-cristo-redentor",
+      "categoria": "lugar",
+      "resposta": "Cristo Redentor",
+      "aliases": [
+        "cristo",
+        "estátua do cristo redentor"
+      ],
+      "dificuldade": 1,
       "dicas": [
         "É visitado todos os anos por milhões de turistas.",
         "Fica em um ponto alto, acima de uma grande cidade.",
@@ -55,8 +35,14 @@
       ]
     },
     {
-      "id": "t-santos-dumont", "categoria": "pessoa", "resposta": "Santos Dumont",
-      "aliases": ["alberto santos dumont", "santos-dumont"], "dificuldade": 1,
+      "id": "t-santos-dumont",
+      "categoria": "pessoa",
+      "resposta": "Santos Dumont",
+      "aliases": [
+        "alberto santos dumont",
+        "santos-dumont"
+      ],
+      "dificuldade": 1,
       "dicas": [
         "Nasceu em uma fazenda do interior, no século 19.",
         "Era filho de um rico fazendeiro de café.",
