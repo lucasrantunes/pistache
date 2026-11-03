@@ -8,7 +8,8 @@
     "scheme": "pistache",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.lucasrantunes.pistache"
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +18,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.lucasrantunes.pistache"
     },
     "web": {
       "output": "server",
@@ -32,11 +34,31 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "react-native-audio-api",
+        {
+          "iosMicrophonePermission": "O Pistache usa o microfone para ouvir as respostas e a palavra Pistache durante a rodada.",
+          "androidPermissions": [
+            "android.permission.RECORD_AUDIO"
+          ]
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "4aa15ef9-5fd7-4b75-a3a6-98f23f61d461"
+      }
+    },
+    "owner": "lucasrantunes"
   }
 }

@@ -1,4 +1,5 @@
 // Tela provisória de texto para jogar o núcleo (Fase 1). Sem visual final.
+import { Link } from 'expo-router';
 import { useReducer, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -44,6 +45,7 @@ export default function Jogo() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#130d2f' }}>
       <ScrollView contentContainerStyle={{ padding: 20 }}>
         <T size={28} color="#ffca4b" bold>Pistache</T>
+        <Link href="/voz" style={{ color: '#b79cff', fontSize: 16, marginBottom: 8 }}>Teste de voz →</Link>
 
         {state.phase === 'setup' && (
           <View>
