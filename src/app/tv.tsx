@@ -17,6 +17,8 @@ import { KIND_COLOR, RankingList, SpecialLegend } from '@/ui/ranking';
 import { C, F } from '@/ui/theme';
 
 const CODE_KEY = 'pistache:tv-code';
+// Vídeo preto de 2 s, sem som, em repetição: faz TVs sem a função "manter tela ligada" acharem que alguém está assistindo.
+const NOSLEEP_VIDEO = 'data:video/mp4;base64,AAAAJGZ0eXBpc29tAAACAGlzb21pc282aXNvMmF2YzFtcDQxAAAC5m1vb3YAAABsbXZoZAAAAAAAAAAAAAAAAAAAA+gAAAAAAAEAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAHodHJhawAAAFx0a2hkAAAAAwAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAABAAAAAQAAAAAABhG1kaWEAAAAgbWRoZAAAAAAAAAAAAAAAAAAAKAAAAAAAVcQAAAAAAC1oZGxyAAAAAAAAAAB2aWRlAAAAAAAAAAAAAAAAVmlkZW9IYW5kbGVyAAAAAS9taW5mAAAAFHZtaGQAAAABAAAAAAAAAAAAAAAkZGluZgAAABxkcmVmAAAAAAAAAAEAAAAMdXJsIAAAAAEAAADvc3RibAAAAKNzdHNkAAAAAAAAAAEAAACTYXZjMQAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAABAAEAASAAAAEgAAAAAAAAAARVMYXZjNjAuMzEuMTAyIGxpYngyNjQAAAAAAAAAAAAAABj//wAAAC1hdmNDAULACv/hABZnQsAK2hCbARAAAAMAEAAAAwCg8SJqAQAEaM4PyAAAABBwYXNwAAAAAQAAAAEAAAAQc3R0cwAAAAAAAAAAAAAAEHN0c2MAAAAAAAAAAAAAABRzdHN6AAAAAAAAAAAAAAAAAAAAEHN0Y28AAAAAAAAAAAAAAChtdmV4AAAAIHRyZXgAAAAAAAAAAQAAAAEAAAAAAAAAAAAAAAAAAABidWR0YQAAAFptZXRhAAAAAAAAACFoZGxyAAAAAAAAAABtZGlyYXBwbAAAAAAAAAAAAAAAAC1pbHN0AAAAJal0b28AAAAdZGF0YQAAAAEAAAAATGF2ZjYwLjE2LjEwMAAAAJhtb29mAAAAEG1maGQAAAAAAAAAAQAAAIB0cmFmAAAAJHRmaGQAAAA5AAAAAQAAAAAAAAMKAAAIAAAAApEBAQAAAAAAFHRmZHQBAAAAAAAAAAAAAAAAAABAdHJ1bgAAAgUAAAAKAAAAoAIAAAAAAAKRAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAACgAAAAoAAAAKAAAC821kYXQAAAJvBgX//2vcRem95tlIt5Ys2CDZI+7veDI2NCAtIGNvcmUgMTY0IHIzMTA4IDMxZTE5ZjkgLSBILjI2NC9NUEVHLTQgQVZDIGNvZGVjIC0gQ29weWxlZnQgMjAwMy0yMDIzIC0gaHR0cDovL3d3dy52aWRlb2xhbi5vcmcveDI2NC5odG1sIC0gb3B0aW9uczogY2FiYWM9MCByZWY9MSBkZWJsb2NrPTE6MDowIGFuYWx5c2U9MHgxOjB4MTExIG1lPWhleCBzdWJtZT0yIHBzeT0xIHBzeV9yZD0xLjAwOjAuMDAgbWl4ZWRfcmVmPTAgbWVfcmFuZ2U9MTYgY2hyb21hX21lPTEgdHJlbGxpcz0wIDh4OGRjdD0wIGNxbT0wIGRlYWR6b25lPTIxLDExIGZhc3RfcHNraXA9MSBjaHJvbWFfcXBfb2Zmc2V0PTAgdGhyZWFkcz0yIGxvb2thaGVhZF90aHJlYWRzPTEgc2xpY2VkX3RocmVhZHM9MCBucj0wIGRlY2ltYXRlPTEgaW50ZXJsYWNlZD0wIGJsdXJheV9jb21wYXQ9MCBjb25zdHJhaW5lZF9pbnRyYT0wIGJmcmFtZXM9MCB3ZWlnaHRwPTAga2V5aW50PTI1MCBrZXlpbnRfbWluPTUgc2NlbmVjdXQ9NDAgaW50cmFfcmVmcmVzaD0wIHJjX2xvb2thaGVhZD0xMCByYz1jcmYgbWJ0cmVlPTEgY3JmPTIzLjAgcWNvbXA9MC42MCBxcG1pbj0wIHFwbWF4PTY5IHFwc3RlcD00IGlwX3JhdGlvPTEuNDAgYXE9MToxLjAwAIAAAAAaZYiEBH///w9FAAEqvycnJ1111111111114AAAAAGQZogEfCMAAAABkGaQBHwjAAAAAZBmmAR8IwAAAAGQZqAEfCMAAAABkGaoBHwjAAAAAZBmsAR8IwAAAAGQZrgEfCMAAAABkGbABDwjAAAAAZBmyA/wjAAAABDbWZyYQAAACt0ZnJhAQAAAAAAAAEAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAwoBAQEAAAAQbWZybwAAAAAAAABD';
 const SPOTS = trackSpots();
 const CURVE = trackCurve();
 const STONES = floorStones();
@@ -30,6 +32,25 @@ function loadCode(): string {
   const code = newRoomCode();
   try { if (typeof localStorage !== 'undefined') localStorage.setItem(CODE_KEY, code); } catch { /* ok */ }
   return code;
+}
+
+/** Mantém a TV acordada: pede ao navegador para não apagar a tela e refaz o pedido quando a aba volta. */
+function useKeepAwake() {
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof navigator === 'undefined') return;
+    let lock: { release: () => Promise<void> } | null = null;
+    let active = true;
+    const ask = async () => {
+      try {
+        const wl = (navigator as unknown as { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } }).wakeLock;
+        if (wl && active && document.visibilityState === 'visible') lock = await wl.request('screen');
+      } catch { /* navegador da TV sem suporte: o vídeo de reserva cobre */ }
+    };
+    ask();
+    const onVisible = () => { if (document.visibilityState === 'visible') ask(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { active = false; document.removeEventListener('visibilitychange', onVisible); lock?.release().catch(() => {}); };
+  }, []);
 }
 
 // Estilos só da web (a TV roda no navegador).
@@ -319,6 +340,7 @@ export default function Tv() {
   const [code] = useState(loadCode);
   const [view, setView] = useState<TvView | null>(null);
   const [status, setStatus] = useState<RoomStatus>('connecting');
+  useKeepAwake();
 
   useEffect(() => {
     const room = joinRoom(code, {
@@ -341,7 +363,12 @@ export default function Tv() {
           : screen === 'ranking' ? <RankingScene view={view} code={code} />
           : screen === 'final' ? <FinalScene view={view} code={code} />
           : <PlayScene view={view} code={code} />}
+        {/* Bordas que se desfazem no fundo: em telas de outra proporção o quadro não termina em corte seco. */}
+        <View style={[abs, web({ left: 0, top: 0, width: TV_WIDTH, height: TV_HEIGHT, pointerEvents: 'none', boxShadow: `inset 0 0 70px 28px ${C.bg}` })]} />
       </View>
+      {Platform.OS === 'web'
+        ? createElement('video', { src: NOSLEEP_VIDEO, autoPlay: true, loop: true, muted: true, playsInline: true, 'aria-hidden': true, style: { position: 'absolute', width: 2, height: 2, opacity: 0.01, pointerEvents: 'none' } })
+        : null}
     </View>
   );
 }

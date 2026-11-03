@@ -2,12 +2,12 @@
 import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
-import { MAX_CLUES, SPECIAL_SQUARES, SQUARES } from '@/game';
+import { AUTO_SECONDS, MAX_CLUES, SPECIAL_SQUARES, SQUARES } from '@/game';
 import type { RankRow, SpecialKind } from '@/game';
 
 import { isValidCode, normalizeCode } from '@/realtime/code';
 
-import { Btn, Medal, Pill, RoomChip, Screen, T } from './kit';
+import { Btn, CountdownBtn, Medal, Pill, RoomChip, Screen, T } from './kit';
 import { KIND_COLOR, RankingList, SpecialLegend } from './ranking';
 import { C, F } from './theme';
 
@@ -214,7 +214,7 @@ export function EffectScreen({ name, color, gained, before, after, fromSquare, t
         <T font="heavy" size={18} style={{ textAlign: 'center' }}>{detail}</T>
         {kind === 'bad' ? <T size={13} color={C.muted} style={{ textAlign: 'center' }}>Regra de honra: o app não sabe quem fala, então ninguém mais entrega o jogador mudo.</T> : null}
       </View>
-      <Btn label="Ver placar" onPress={onNext} />
+      <CountdownBtn label="Ver placar" seconds={AUTO_SECONDS.effect} onPress={onNext} />
     </Screen>
   );
 }
@@ -267,7 +267,7 @@ export function RankingScreen({ cardNo, answer, goal, rows, order, tiebreak, fin
       <RankingList rows={rows} order={order} goal={goal} />
       <SpecialLegend />
       {tiebreak ? <T font="heavy" size={16} color={C.orange} style={{ textAlign: 'center' }}>Empate na meta! Vem uma carta de desempate.</T> : null}
-      <Btn label={final ? 'Ver o vencedor' : tiebreak ? 'Carta de desempate' : 'Próxima carta'} onPress={onNext} />
+      <CountdownBtn label={final ? 'Ver o vencedor' : tiebreak ? 'Carta de desempate' : 'Próxima carta'} seconds={AUTO_SECONDS.ranking} onPress={onNext} />
     </Screen>
   );
 }
@@ -293,7 +293,7 @@ export function FinalScreen({ winners, cards, rows, order, goal, onAgain, onChan
         {top ? <T size={16} color={C.muted}>{top.points} pontos</T> : null}
       </View>
       <RankingList rows={rows} order={order} goal={goal} />
-      <Btn label="Jogar de novo" onPress={onAgain} />
+      <CountdownBtn label="Jogar de novo" seconds={AUTO_SECONDS.playAgain} onPress={onAgain} cancelable />
       <Btn kind="ghost" label="Trocar jogadores" onPress={onChange} />
     </Screen>
   );

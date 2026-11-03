@@ -1,19 +1,21 @@
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { AppState, Pressable, ScrollView, Text, View } from 'react-native';
 import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { C, F } from './theme';
+import { animalDe, Rosto } from './animais';
+import { C, F, PLAYER_COLORS } from './theme';
 
 export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       {scroll ? (
-        <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 32, width: '100%', maxWidth: 560, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
           {children}
         </ScrollView>
       ) : (
-        <View style={{ flex: 1, padding: 16, gap: 12 }}>{children}</View>
+        <View style={{ flex: 1, padding: 16, gap: 12, width: '100%', maxWidth: 560, alignSelf: 'center' }}>{children}</View>
       )}
     </SafeAreaView>
   );
@@ -90,50 +92,92 @@ export function Btn({
   );
 }
 
-// ---------- Medalha do jogador (decisão 47: avatar de bichinho) ----------
-
-/** Mistura a cor do jogador com branco para o rosto da medalha. */
-function pastel(hex: string, amount = 0.62): string {
-  const n = parseInt(hex.replace('#', ''), 16);
-  const mix = (c: number) => Math.round(c + (255 - c) * amount);
-  return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
-}
-
-/** Orelhas redondas ou compridas, conforme o nome (sempre o mesmo para o mesmo jogador). */
-const tallEars = (name: string): boolean => (name.charCodeAt(0) + name.length) % 2 === 0;
+// ---------- Medalha do jogador (decisão 47: bichinho, como no Pitaco) ----------
 
 /**
- * Medalha: disco escuro, anel na cor do jogador e carinha de bichinho.
- * Tudo medido em "em" (size / 3), como no sketch. `sad` = carinha triste (casa de azar); `leader` = coroa.
+ * Medalha: anel na cor do jogador e rosto de bichinho. Cada cor tem um bicho (o mesmo durante a partida).
+ * `sad` = carinha triste (casa de azar); `leader` = coroa.
  */
 export function Medal({
   name, color, size = 44, leader = false, sad = false,
 }: { name: string; color: string; size?: number; leader?: boolean; sad?: boolean }) {
-  const e = size / 3;
-  const face = pastel(color);
-  const earH = (tallEars(name) ? 0.95 : 0.75) * e;
-  const b = 0.16 * e; // largura do anel; as medidas do sketch partem de dentro dele
-  const dot = (left: number) => (
-    <View style={{ position: 'absolute', left: left * e + b, top: 1.34 * e + b, width: 0.22 * e, height: 0.28 * e, borderRadius: e, backgroundColor: C.dark }} />
-  );
+  const ring = Math.max(2, size * 0.07);
+  const inner = size - ring * 2;
+  const animal = animalDe(PLAYER_COLORS.indexOf(color), name);
   return (
     <View style={{ width: size, height: size }} accessibilityLabel={name}>
       {leader ? (
-        <Text style={{ position: 'absolute', top: -0.95 * e, left: 0, right: 0, textAlign: 'center', fontSize: 1.1 * e, lineHeight: 1.3 * e, color: C.yellow, zIndex: 2 }}>♛</Text>
+        <Text style={{ position: 'absolute', top: -size * 0.32, left: 0, right: 0, textAlign: 'center', fontSize: size * 0.37, lineHeight: size * 0.43, color: C.yellow, zIndex: 2 }}>♛</Text>
       ) : null}
-      <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: C.track, overflow: 'hidden' }}>
-        <View style={{ position: 'absolute', left: 0.42 * e + b, top: 0.3 * e + b, width: 0.7 * e, height: earH, borderRadius: e, backgroundColor: face }} />
-        <View style={{ position: 'absolute', right: 0.42 * e + b, top: 0.3 * e + b, width: 0.7 * e, height: earH, borderRadius: e, backgroundColor: face }} />
-        <View style={{ position: 'absolute', left: 0.46 * e + b, top: 0.74 * e + b, width: 1.76 * e, height: 1.76 * e, borderRadius: e, backgroundColor: face }} />
-        {dot(0.84)}
-        {dot(1.62)}
-        {sad ? (
-          <View style={{ position: 'absolute', left: 1.15 * e + b, top: 1.78 * e + b, width: 0.4 * e, height: 0.22 * e, borderTopLeftRadius: e, borderTopRightRadius: e, backgroundColor: C.red }} />
-        ) : (
-          <View style={{ position: 'absolute', left: 1.15 * e + b, top: 1.7 * e + b, width: 0.4 * e, height: 0.26 * e, borderRadius: e, backgroundColor: C.red }} />
-        )}
-        <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderRadius: size / 2, borderWidth: b, borderColor: color }} />
+      <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color, padding: ring }}>
+        <View style={{ width: inner, height: inner, borderRadius: inner / 2, overflow: 'hidden' }}>
+          <Rosto animal={animal} triste={sad} tamanho={inner} />
+        </View>
       </View>
+    </View>
+  );
+}
+
+// ---------- Botão com contagem (avanço automático) ----------
+
+/**
+ * Botão que se enche e dispara `onPress` sozinho quando o tempo acaba (como o "próximo episódio").
+ * Voltar de outro app reinicia a contagem. `cancelable` mostra um "Cancelar" que para só a contagem.
+ */
+export function CountdownBtn({
+  label, seconds, onPress, cancelable = false, kind = 'primary',
+}: { label: string; seconds: number; onPress: () => void; cancelable?: boolean; kind?: 'primary' | 'ghost' }) {
+  const [left, setLeft] = useState(seconds);
+  const [stopped, setStopped] = useState(false);
+  const [away, setAway] = useState(false);
+  const [w, setW] = useState(0);
+  const fire = useRef(onPress);
+  fire.current = onPress;
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      const gone = s !== 'active';
+      setAway(gone);
+      if (gone) setLeft(seconds);
+    });
+    return () => sub.remove();
+  }, [seconds]);
+
+  const running = !stopped && !away;
+  useEffect(() => {
+    if (!running) return;
+    const end = Date.now() + left * 1000;
+    const id = setInterval(() => {
+      const s = Math.ceil((end - Date.now()) / 1000);
+      if (s > 0) { setLeft(s); return; }
+      clearInterval(id);
+      setStopped(true);
+      fire.current();
+    }, 250);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running]);
+
+  const primary = kind === 'primary';
+  const frac = stopped ? 0 : 1 - left / seconds;
+  return (
+    <View style={{ gap: 6 }}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => { setStopped(true); onPress(); }}
+        onLayout={(e) => setW(e.nativeEvent.layout.width)}
+        style={{ height: 64, borderRadius: 22, overflow: 'hidden', justifyContent: 'center', backgroundColor: primary ? C.lavenderDark : 'transparent', borderWidth: primary ? 0 : 2, borderColor: C.line }}>
+        {!stopped ? <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: w * frac, backgroundColor: primary ? C.lavender : C.line }} /> : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <Text style={{ color: primary ? C.dark : C.ink, fontFamily: F.brand, fontSize: 24 }}>{label}</Text>
+          {!stopped ? <Text style={{ color: primary ? C.dark : C.muted, fontFamily: F.heavy, fontSize: 18 }}>{left}s</Text> : null}
+        </View>
+      </Pressable>
+      {cancelable && !stopped ? (
+        <Pressable accessibilityRole="button" onPress={() => setStopped(true)} style={{ alignSelf: 'center', paddingVertical: 4, paddingHorizontal: 14 }}>
+          <Text style={{ color: C.muted, fontFamily: F.heavy, fontSize: 14 }}>Cancelar contagem</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

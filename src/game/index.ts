@@ -6,3 +6,4 @@ export * from './deck.ts';
 export * from './idle.ts';
 export * from './describe.ts';
 export * from './ranking.ts';
+export * from './timing.ts';
