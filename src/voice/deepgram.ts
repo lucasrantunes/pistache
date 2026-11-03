@@ -9,6 +9,8 @@ export type DeepgramHandlers = {
 
 export type DeepgramConnection = {
   sendAudio: (pcm: ArrayBuffer) => void;
+  /** Pede a transcrição final do que já foi enviado (fim de uma fala). */
+  finalize: () => void;
   close: () => void;
 };
 
@@ -59,6 +61,12 @@ export function openDeepgram(apiKey: string, sampleRate: number, handlers: Deepg
     sendAudio(pcm) {
       if (socket.readyState === 1) {
         socket.send(pcm);
+        lastSent = Date.now();
+      }
+    },
+    finalize() {
+      if (socket.readyState === 1) {
+        socket.send(JSON.stringify({ type: 'Finalize' }));
         lastSent = Date.now();
       }
     },

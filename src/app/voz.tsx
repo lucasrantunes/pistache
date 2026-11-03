@@ -11,6 +11,7 @@ import type { DeepgramConnection } from '@/voice/deepgram';
 import { startMic } from '@/voice/mic';
 import type { Mic } from '@/voice/mic';
 import { detectCommand, matchesAnswer } from '@/voice/text';
+import { VoiceActivityGate, splitFrames } from '@/voice/voice-activity';
 
 type Status = 'parado' | 'conectando' | 'ouvindo';
 type Line = { id: number; text: string; note: string };
@@ -33,6 +34,11 @@ export default function Voz() {
   const cardRef = useRef(0);
   const nextId = useRef(1);
   const sentSamples = useRef(0);
+  const capturedSamples = useRef(0);
+  const gate = useRef(new VoiceActivityGate());
+  const gateOn = useRef(true);
+  const [useGate, setUseGate] = useState(true);
+  const [captured, setCaptured] = useState(0);
   cardRef.current = cardIndex;
 
   const addLine = (text: string, note: string) =>
@@ -60,7 +66,10 @@ export default function Voz() {
     if (!KEY) { setError('Falta a chave: EXPO_PUBLIC_DEEPGRAM_KEY no arquivo .env.local'); return; }
     setStatus('conectando');
     sentSamples.current = 0;
+    capturedSamples.current = 0;
+    gate.current = new VoiceActivityGate();
     setSeconds(0);
+    setCaptured(0);
     let connection: DeepgramConnection | null = null;
     try {
       mic.current = await startMic({
@@ -75,9 +84,22 @@ export default function Voz() {
             });
             dg.current = connection;
           }
-          sentSamples.current += pcm.byteLength / 2;
+          capturedSamples.current += pcm.byteLength / 2;
+          setCaptured(Math.round(capturedSamples.current / sampleRate));
+          for (const { frame, rms } of splitFrames(pcm, sampleRate)) {
+            if (!gateOn.current) {
+              sentSamples.current += frame.byteLength / 2;
+              connection.sendAudio(frame);
+              continue;
+            }
+            const r = gate.current.push(frame, rms);
+            for (const f of r.send) {
+              sentSamples.current += f.byteLength / 2;
+              connection.sendAudio(f);
+            }
+            if (r.finalize) connection.finalize();
+          }
           setSeconds(Math.round(sentSamples.current / sampleRate));
-          connection.sendAudio(pcm);
         },
       });
     } catch (e) {
@@ -117,7 +139,8 @@ export default function Voz() {
           ? <Btn label="Começar a ouvir" color="#39e58c" onPress={start} />
           : <Btn label="Parar" color="#ff777b" onPress={stop} />}
         <T b c={status === 'ouvindo' ? '#39e58c' : '#b8abdc'}>Estado: {status}{paused ? ' · PAUSADO' : ''}</T>
-        <T c="#b8abdc">Taxa do microfone: {rate || '—'} Hz · áudio enviado: {seconds}s</T>
+        <T c="#b8abdc">Taxa do microfone: {rate || '—'} Hz · captado: {captured}s · enviado: {seconds}s{captured > 0 ? ` (${Math.round((seconds / captured) * 100)}%)` : ''}</T>
+        <Btn label={useGate ? 'Filtro de silêncio: LIGADO (tocar para desligar)' : 'Filtro de silêncio: DESLIGADO (tocar para ligar)'} color="#372762" onPress={() => { gateOn.current = !useGate; setUseGate(!useGate); }} />
         {error ? <T c="#ff777b" b>{error}</T> : null}
         <View style={{ marginTop: 10, padding: 12, borderRadius: 12, backgroundColor: '#211747' }}>
           <T c="#b8abdc" s={13}>OUVINDO AGORA</T>
