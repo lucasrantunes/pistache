@@ -3,7 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 
 import type { TvView } from './view';
 
-const URL_BASE = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+function baseUrl(raw: string): string {
+  try { return new URL(raw.trim()).origin; } catch { return raw.trim(); }
+}
+const URL_BASE = baseUrl(process.env.EXPO_PUBLIC_SUPABASE_URL ?? '');
 const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 let client: ReturnType<typeof createClient> | null = null;
@@ -39,7 +42,8 @@ export function joinRoom(code: string, handlers: RoomHandlers): Room {
   channel.on('broadcast', { event: 'state' }, ({ payload }) => handlers.onState?.(payload as TvView));
   channel.on('broadcast', { event: 'hello' }, () => handlers.onHello?.());
   handlers.onStatus?.('connecting');
-  channel.subscribe((status) => {
+  channel.subscribe((status, err) => {
+    if (status !== 'SUBSCRIBED') console.warn('[sala]', status, err?.message ?? '');
     if (status === 'SUBSCRIBED') {
       ready = true;
       handlers.onStatus?.('ready');

@@ -1,5 +1,5 @@
 // Captura do microfone (react-native-audio-api) entregando blocos de áudio PCM 16 bits.
-import { AudioManager, AudioRecorder } from 'react-native-audio-api';
+// Carregado só quando precisa: no Expo Go (sem esse módulo nativo) o app abre, só sem voz.
 
 const WANTED_RATE = 16000;
 
@@ -20,6 +20,13 @@ function toInt16(input: Float32Array): ArrayBuffer {
 }
 
 export async function startMic(handlers: MicHandlers): Promise<Mic> {
+  let lib: typeof import('react-native-audio-api');
+  try {
+    lib = await import('react-native-audio-api');
+  } catch {
+    throw new Error('Voz indisponível neste app (use o app de teste). Use os botões.');
+  }
+  const { AudioManager, AudioRecorder } = lib;
   const permission = await AudioManager.requestRecordingPermissions();
   if (permission !== 'Granted') throw new Error('Sem permissão de microfone.');
 

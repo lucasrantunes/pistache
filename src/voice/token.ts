@@ -1,5 +1,8 @@
 // Pede ao servidor (Supabase) um token temporário da Deepgram.
-const URL_BASE = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+function baseUrl(raw: string): string {
+  try { return new URL(raw.trim()).origin; } catch { return raw.trim(); }
+}
+const URL_BASE = baseUrl(process.env.EXPO_PUBLIC_SUPABASE_URL ?? '');
 const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 export const hasVoiceServer = (): boolean => Boolean(URL_BASE && ANON_KEY);
