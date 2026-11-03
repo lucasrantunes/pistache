@@ -58,6 +58,8 @@ export type ViewExtras = {
   guesses: string[];
   colors: string[];
   startPoints?: Record<string, number>;
+  /** Nome da categoria para mostrar (sem isso, vai o id). */
+  categoryLabel?: string;
   screen?: TvScreen;
 };
 
@@ -84,7 +86,7 @@ export function toView(state: GameState, extras: ViewExtras): TvView {
     goal: state.goal,
     cardIndex: state.cardIndex,
     total: state.cards.length,
-    category: card?.categoria ?? '',
+    category: extras.categoryLabel || (card?.categoria ?? ''),
     clue: state.clue,
     points: cluePoints(state.clue),
     clueText: state.phase === 'clue' && card ? card.dicas[state.clue - 1] : null,

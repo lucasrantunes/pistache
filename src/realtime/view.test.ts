@@ -41,3 +41,8 @@ test('código de sala', () => {
   assert.equal(normalizeCode(' ab-c d9e '), 'ABCD');
   assert.ok(!isValidCode('AB1D'));
 });
+
+test('a TV mostra o nome da categoria quando ele é enviado', () => {
+  assert.equal(toView(start(), { ...extras, categoryLabel: 'Esporte/Música' }).category, 'Esporte/Música');
+  assert.equal(toView(start(), extras).category, 'coisa');
+});

@@ -1,0 +1,38 @@
+{
+  "id": "animais",
+  "versao": 1,
+  "cartas": [
+    {
+      "id": "animal-capivara",
+      "categoria": "animal",
+      "resposta": "Capivara",
+      "aliases": [
+        "capivaras"
+      ],
+      "dificuldade": 1,
+      "dicas": [
+        "Vive em grupos e costuma passar boa parte do dia perto da água.",
+        "É nativa da América do Sul.",
+        "Costuma ficar mais ativa ao amanhecer e ao entardecer.",
+        "Come só vegetais, principalmente capim e plantas aquáticas.",
+        "Nada muito bem e consegue ficar um bom tempo debaixo da água.",
+        "Tem membranas entre os dedos, que ajudam a nadar.",
+        "Os dentes da frente crescem durante toda a vida.",
+        "É um mamífero de corpo robusto e pelo áspero, marrom-avermelhado.",
+        "Os filhotes nascem de olhos abertos e logo saem andando.",
+        "Um adulto pode passar dos 50 quilos.",
+        "Praticamente não tem cauda.",
+        "Pertence ao grupo dos roedores, parente do porquinho-da-índia.",
+        "É o maior roedor do mundo.",
+        "Aparece com frequência em parques e lagos de cidades brasileiras.",
+        "É famosa por ficar tranquila mesmo com outros bichos pousados nas costas.",
+        "No Pantanal é uma presença muito comum.",
+        "O nome vem do tupi e lembra a ideia de \"comedor de capim\".",
+        "O nome tem quatro sílabas.",
+        "O nome termina com \"vara\".",
+        "O nome começa com \"Capi\"."
+      ],
+      "notas": "Exemplo para testar a estrutura; revisar os fatos antes do lançamento."
+    }
+  ]
+}

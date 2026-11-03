@@ -1,12 +1,13 @@
 // Partida no celular do operador: dicas, voz, pontos e as telas do layout aprovado.
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
-import pack from '@/content/packs/teste.json';
+import { CARTAS, CATEGORIAS } from '@/content';
+import { rotuloDaCategoria } from '@/content/catalog';
 import {
-  cluePoints, createInitialState, currentCard, effectText as describeEffect, idleState, rankRows, reduce, shuffle,
+  buildDeck, cluePoints, createInitialState, currentCard, effectText as describeEffect, idleState, rankRows, reduce,
 } from '@/game';
-import type { Card, SpecialKind } from '@/game';
+import type { SpecialKind } from '@/game';
 import { joinRoom } from '@/realtime/room';
 import type { Room, RoomStatus } from '@/realtime/room';
 import { toView } from '@/realtime/view';
@@ -19,20 +20,24 @@ import type { UiPlayer } from '@/ui/phone';
 import { colorOf } from '@/ui/ranking';
 import { C, PLAYER_COLORS } from '@/ui/theme';
 
-const CARDS = pack.cartas as unknown as Card[];
-
 /** Depois de uma carta: efeito da casa -> placar -> (fim de jogo). Só da tela; as regras ficam no reducer. */
 type Step = 'result' | 'ranking' | 'final';
+
+/** Categorias escolhidas na tela inicial (lista vazia = todas). */
+function parseCats(raw?: string): string[] {
+  try { return (JSON.parse(raw ?? '[]') as unknown[]).filter((c): c is string => typeof c === 'string'); } catch { return []; }
+}
 
 const kindOf = (k: string): SpecialKind => (k === 'dobro' || k === 'ladrao' || k === 'turbo' ? k : 'bad');
 
 export default function Jogo() {
-  const params = useLocalSearchParams<{ names?: string; goal?: string; room?: string }>();
+  const params = useLocalSearchParams<{ names?: string; goal?: string; room?: string; cats?: string }>();
+  const cats = useMemo(() => parseCats(params.cats), [params.cats]);
   const [state, dispatch] = useReducer(reduce, params, (p) => {
     let names: string[] = [];
     try { names = JSON.parse(p.names ?? '[]'); } catch { /* sem nomes */ }
     const seed = Date.now() % 2147483647;
-    return reduce(createInitialState(), { type: 'START', names, goal: Number(p.goal) || 50, cards: shuffle(CARDS, seed), seed });
+    return reduce(createInitialState(), { type: 'START', names, goal: Number(p.goal) || 50, cards: buildDeck(CARTAS, parseCats(p.cats), seed), seed });
   });
 
   const [paused, setPaused] = useState(false);
@@ -120,7 +125,7 @@ export default function Jogo() {
   const tvScreen: TvScreen = !afterCard ? 'round' : shown === 'result' ? 'effect' : shown;
 
   const order = state.players.map((p) => p.id);
-  const view = toView(state, { paused, heard: heard !== null, guesses: [], colors: PLAYER_COLORS, startPoints, screen: tvScreen });
+  const view = toView(state, { categoryLabel: state.cards.length ? rotuloDaCategoria(CATEGORIAS, currentCard(state).categoria) : '', paused, heard: heard !== null, guesses: [], colors: PLAYER_COLORS, startPoints, screen: tvScreen });
   const viewJson = JSON.stringify(view);
   useEffect(() => {
     viewRef.current = view;
@@ -149,7 +154,7 @@ export default function Jogo() {
   const playAgain = () => {
     const seed = Date.now() % 2147483647;
     setStep('result'); setPaused(false); setHeard(null); setPicking(false); setStartPoints({});
-    dispatch({ type: 'START', names: state.players.map((p) => p.name), goal: state.goal, cards: shuffle(CARDS, seed), seed });
+    dispatch({ type: 'START', names: state.players.map((p) => p.name), goal: state.goal, cards: buildDeck(CARTAS, cats, seed), seed });
   };
 
   if (!card) {
@@ -180,7 +185,7 @@ export default function Jogo() {
     }
     return (
       <RoundScreen
-        category={card.categoria}
+        category={rotuloDaCategoria(CATEGORIAS, card.categoria)}
         roomCode={roomCode}
         tvReady={tvStatus === 'ready'}
         clue={state.clue}
@@ -210,7 +215,7 @@ export default function Jogo() {
       <RevealScreen
         cardNo={state.cardIndex + 1}
         answer={card.resposta}
-        category={card.categoria}
+        category={rotuloDaCategoria(CATEGORIAS, card.categoria)}
         players={eligible}
         onPick={(id) => pickClosest(id)}
         onNone={() => pickClosest(null)}

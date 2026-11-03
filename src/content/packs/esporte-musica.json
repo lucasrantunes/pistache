@@ -1,0 +1,39 @@
+{
+  "id": "esporte-musica",
+  "versao": 1,
+  "cartas": [
+    {
+      "id": "esporte-volei",
+      "categoria": "esporte-musica",
+      "resposta": "Vôlei",
+      "aliases": [
+        "volei",
+        "voleibol"
+      ],
+      "dificuldade": 1,
+      "dicas": [
+        "É praticado em equipe, com uma rede dividindo a quadra ao meio.",
+        "Cada equipe fica no seu lado, sem contato físico direto com a outra.",
+        "Cada lado da quadra mede 9 metros por 9 metros.",
+        "Quase toda jogada começa com um saque.",
+        "A partida é dividida em sets.",
+        "Cada equipe tem seis jogadores em quadra.",
+        "A bola não pode cair no chão do seu lado.",
+        "Cada equipe pode tocar na bola até três vezes seguidas antes de devolvê-la.",
+        "Há um jogador de uniforme diferente que só atua na defesa: o líbero.",
+        "Os jogadores giram de posição sempre que a equipe ganha o saque.",
+        "Uma jogada de ataque famosa se chama cortada.",
+        "Na rede, os jogadores tentam fazer o bloqueio.",
+        "Existe uma versão jogada na areia, em duplas.",
+        "A bola é leve e redonda, tocada com as mãos e os antebraços.",
+        "Foi inventado em 1895, nos Estados Unidos, por William G. Morgan.",
+        "Morgan queria um esporte menos pesado que o basquete.",
+        "O Brasil é uma potência, com várias medalhas olímpicas.",
+        "Bernardinho é um técnico muito famoso nessa modalidade.",
+        "O nome tem cinco letras.",
+        "O nome começa com a letra V."
+      ],
+      "notas": "Exemplo para testar a estrutura; revisar os fatos antes do lançamento."
+    }
+  ]
+}

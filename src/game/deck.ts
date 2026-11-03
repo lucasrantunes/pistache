@@ -12,3 +12,15 @@ export function shuffle(cards: Card[], seed: number): Card[] {
   }
   return out;
 }
+
+/**
+ * Monta o baralho da partida: só as categorias escolhidas (vazio = todas), embaralhado pela semente.
+ * Cartas já jogadas (`playedIds`, guardadas no aparelho) vão para o fim, para o baralho nunca acabar antes da hora.
+ */
+export function buildDeck(cards: Card[], categoryIds: string[], seed: number, playedIds: string[] = []): Card[] {
+  const pool = categoryIds.length ? cards.filter((c) => categoryIds.includes(c.categoria)) : cards;
+  const played = new Set(playedIds);
+  const fresh = pool.filter((c) => !played.has(c.id));
+  const old = pool.filter((c) => played.has(c.id));
+  return [...shuffle(fresh, seed), ...shuffle(old, seed + 1)];
+}
