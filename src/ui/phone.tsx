@@ -106,9 +106,9 @@ export function RoundScreen(p: RoundProps) {
       </View>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, height: 40, borderRadius: 999, backgroundColor: C.panel, borderWidth: 2, borderColor: p.voiceColor, flexShrink: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, minHeight: 40, paddingVertical: 4, borderRadius: 20, backgroundColor: C.panel, borderWidth: 2, borderColor: p.voiceColor, flexShrink: 1 }}>
           <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: p.voiceColor }} />
-          <T font="heavy" size={14} color={p.voiceColor} numberOfLines={1} style={{ flexShrink: 1 }}>{p.voiceLine}</T>
+          <T font="heavy" size={14} color={p.voiceColor} numberOfLines={2} style={{ flexShrink: 1 }}>{p.voiceLine}</T>
         </View>
         <T size={13} color={p.idleWarn ? C.orange : C.muted} style={{ textAlign: 'right' }}>
           {p.paused ? 'Diga “Pistache”\npara retomar' : `Diga “Pistache” para\na próxima dica · ${p.idleLine}`}

@@ -165,7 +165,7 @@ export default function Jogo() {
   const voiceLine =
     voice.status === 'on' ? (paused ? 'Pausado' : 'Ouvindo a sala')
       : voice.status === 'connecting' ? 'Conectando o microfone…'
-      : voice.status === 'error' ? 'Sem voz: use os botões'
+      : voice.status === 'error' ? `Sem voz (${voice.error}). Use os botões.`
       : 'Microfone desligado';
   const voiceColor = voice.status === 'on' && !paused ? C.green : voice.status === 'error' ? C.red : C.muted;
   const idleLine = idle.kind === 'countdown' ? `avança em ${idle.secondsLeft}s` : idle.kind === 'quiet' ? `${idle.secondsToWarn + 10}s` : '…';
