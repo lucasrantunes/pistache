@@ -1,6 +1,6 @@
 import {
-  DEFAULT_GOAL, LOSE_POINTS, MAX_CLUES, MAX_PLAYERS, MIN_PLAYERS, NO_WINNER_POINTS, SPECIAL_SQUARES,
-  SQUARES, STEAL_POINTS, cluePoints, squareOf,
+  DEFAULT_GOAL, MAX_CLUES, MAX_PLAYERS, MIN_PLAYERS, NO_WINNER_POINTS, SPECIAL_SQUARES,
+  SQUARES, cluePoints, losePoints, squareOf, stealPoints,
 } from './board.ts';
 import { pickIndex } from './rng.ts';
 import type { Effect, EffectKind, GameEvent, GameState, Player, RoundResult } from './types.ts';
@@ -8,7 +8,7 @@ import type { Effect, EffectKind, GameEvent, GameState, Player, RoundResult } fr
 export function createInitialState(): GameState {
   return {
     phase: 'setup', players: [], goal: DEFAULT_GOAL, cards: [], cardIndex: 0, clue: 1,
-    muted: [], tiebreakIds: null, seed: 1, lastResult: null, winnerIds: [],
+    muted: [], tiebreakIds: null, seed: 1, lastResult: null, winnerIds: [], undo: null,
   };
 }
 
@@ -44,11 +44,11 @@ function applyEffect(
   if (special === 'ladrao') {
     const ahead = players.filter((p) => p.points > me.points);
     if (ahead.length === 0) {
-      return { players: set(meId, (p) => ({ ...p, points: p.points + STEAL_POINTS })), seed, effect: { kind: 'ladrao', amount: STEAL_POINTS } };
+      return { players: set(meId, (p) => ({ ...p, points: p.points + stealPoints(goal) })), seed, effect: { kind: 'ladrao', amount: stealPoints(goal) } };
     }
     const [i, s] = pickIndex(seed, ahead.length);
     const victim = ahead[i];
-    const amount = Math.min(STEAL_POINTS, victim.points);
+    const amount = Math.min(stealPoints(goal), victim.points);
     const next = players.map((p) =>
       p.id === victim.id ? { ...p, points: p.points - amount } : p.id === meId ? { ...p, points: p.points + amount } : p);
     return { players: next, seed: s, effect: { kind: 'ladrao', targetId: victim.id, amount } };
@@ -60,7 +60,7 @@ function applyEffect(
   const [oi, s1] = pickIndex(seed, options.length);
   const kind = options[oi];
   if (kind === 'lose3') {
-    const amount = Math.min(LOSE_POINTS, me.points);
+    const amount = Math.min(losePoints(goal), me.points);
     return { players: set(meId, (p) => ({ ...p, points: p.points - amount })), seed: s1, effect: { kind, amount } };
   }
   if (kind === 'mute') {
@@ -94,7 +94,24 @@ function award(state: GameState, playerId: string, gained: number, kind: 'correc
   return settle({ ...state, players, seed, lastResult });
 }
 
+/** Pontua e guarda uma cópia do jogo antes, para a correção. */
 export function reduce(state: GameState, event: GameEvent): GameState {
+  if (event.type === 'FIX_WINNER') {
+    const undo = state.undo;
+    if (!undo) return state;
+    const base: GameState = { ...undo.snapshot, undo: null };
+    return reduce(base, undo.kind === 'correct' ? { type: 'CORRECT', playerId: event.playerId } : { type: 'CLOSEST', playerId: event.playerId });
+  }
+  const next = step(state, event);
+  if ((event.type === 'CORRECT' || event.type === 'CLOSEST') && next !== state) {
+    const { undo: _old, ...snapshot } = state;
+    const r = next.lastResult;
+    return { ...next, undo: { snapshot, kind: event.type === 'CORRECT' ? 'correct' : 'closest', winnerId: r?.winnerId ?? null, clue: state.clue, gained: r?.gained ?? 0 } };
+  }
+  return next;
+}
+
+function step(state: GameState, event: GameEvent): GameState {
   switch (event.type) {
     case 'START': {
       const names = event.names.map((n) => n.trim()).filter(Boolean);
@@ -144,6 +161,7 @@ export function reduce(state: GameState, event: GameEvent): GameState {
         lastResult: null,
       };
     }
+    case 'FIX_WINNER': return state;
   }
 }
 

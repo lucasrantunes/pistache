@@ -30,9 +30,9 @@
     "cor": "#ff8f3d"
   },
   {
-    "id": "esporte-musica",
-    "nome": "Esportes e música",
-    "rotulo": "Esporte/Música",
+    "id": "esporte",
+    "nome": "Esportes",
+    "rotulo": "Esporte",
     "cor": "#5cc8ff"
   },
   {

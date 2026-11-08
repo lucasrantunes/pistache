@@ -3,7 +3,6 @@ export * from './reduce.ts';
 export * from './rng.ts';
 export * from './types.ts';
 export * from './deck.ts';
-export * from './idle.ts';
 export * from './describe.ts';
 export * from './ranking.ts';
 export * from './timing.ts';

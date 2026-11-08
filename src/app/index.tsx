@@ -5,21 +5,25 @@ import { Pressable, TextInput, View } from 'react-native';
 
 import { CARTAS, CATEGORIAS } from '@/content';
 import { categoriasDisponiveis } from '@/content/catalog';
-import { MAX_PLAYERS, MIN_PLAYERS } from '@/game';
+import { DEFAULT_GOAL, GOAL_OPTIONS, MAX_PLAYERS, MIN_PLAYERS, estimatedCards, estimatedMinutes } from '@/game';
+import { normalize } from '@/voice/text';
 import { isValidCode, normalizeCode } from '@/realtime/code';
 import { Btn, Glass, Medal, Screen, T } from '@/ui/kit';
 import { C, F, PLAYER_COLORS } from '@/ui/theme';
 
-const GOALS = [30, 50, 70];
 const DISPONIVEIS = categoriasDisponiveis(CATEGORIAS, CARTAS);
 
 export default function Inicio() {
   const [names, setNames] = useState(['', '', '']);
-  const [goal, setGoal] = useState(50);
+  const [goal, setGoal] = useState<number>(DEFAULT_GOAL);
   const [room, setRoom] = useState('');
   const [cats, setCats] = useState<string[]>(DISPONIVEIS.map((c) => c.id));
   const filled = names.map((n) => n.trim()).filter(Boolean);
-  const ready = filled.length >= MIN_PLAYERS && cats.length > 0;
+  // Nomes repetidos atrapalham o "diga o seu nome": cada um precisa de um nome diferente.
+  const repeated = new Set(filled.map(normalize)).size < filled.length;
+  const ready = filled.length >= MIN_PLAYERS && cats.length > 0 && !repeated;
+  const cardsInGame = DISPONIVEIS.filter((c) => cats.includes(c.id)).reduce((n, c) => n + c.total, 0);
+  const players = Math.max(MIN_PLAYERS, filled.length);
   const toggleCat = (id: string) => setCats(cats.includes(id) ? cats.filter((c) => c !== id) : [...cats, id]);
 
   const setName = (i: number, v: string) => setNames(names.map((n, k) => (k === i ? v : n)));
@@ -78,16 +82,20 @@ export default function Inicio() {
       <Glass style={{ gap: 10 }}>
         <T font="mono" size={13} color={C.muted} style={{ letterSpacing: 2 }}>VENCE QUEM CHEGAR A</T>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          {GOALS.map((g) => (
+          {GOAL_OPTIONS.map((g) => (
             <Pressable
               key={g}
               onPress={() => setGoal(g)}
-              style={{ flex: 1, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: goal === g ? C.lavender : C.line, backgroundColor: goal === g ? 'rgba(183,156,255,0.22)' : 'transparent' }}>
+              style={{ flex: 1, height: 62, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: goal === g ? C.lavender : C.line, backgroundColor: goal === g ? 'rgba(183,156,255,0.22)' : 'transparent' }}>
               <T font="heavy" size={20} color={goal === g ? C.ink : C.muted}>{g}</T>
+              <T size={11} color={C.muted}>~{estimatedMinutes(g, players)} min</T>
             </Pressable>
           ))}
         </View>
-        <T size={13} color={C.muted}>Mais pontos, partida mais longa (50 leva cerca de 12 minutos). Deixe o celular na mesa: o microfone só escuta durante a rodada e nada é gravado.</T>
+        <T size={13} color={C.muted}>Tempo estimado para {players} jogadores. Deixe o celular na mesa: o microfone fica ligado durante a partida toda e nada é gravado.</T>
+        {cardsInGame < estimatedCards(goal, players) ? (
+          <T font="heavy" size={13} color={C.orange}>Poucas cartas para essa meta ({cardsInGame} de ~{estimatedCards(goal, players)}): a partida pode acabar antes. Marque mais categorias ou escolha uma meta menor.</T>
+        ) : null}
       </Glass>
 
       <Glass style={{ gap: 10 }}>
@@ -107,6 +115,7 @@ export default function Inicio() {
 
       <Btn label="Começar partida" onPress={play} disabled={!ready} />
       {filled.length < MIN_PLAYERS ? <T size={13} color={C.muted} style={{ textAlign: 'center' }}>Escreva pelo menos {MIN_PLAYERS} nomes.</T> : null}
+      {repeated ? <T size={13} color={C.orange} style={{ textAlign: 'center' }}>Dois jogadores com o mesmo nome. Mude um deles para o jogo saber quem falou.</T> : null}
       <Link href="/voz" style={{ color: C.lavender, fontFamily: F.ui, textAlign: 'center', marginTop: 6 }}>Teste de voz</Link>
     </Screen>
   );

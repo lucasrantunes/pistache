@@ -24,6 +24,8 @@ export type RoomStatus = 'connecting' | 'ready' | 'error';
 
 export type RoomHandlers = {
   onState?: (view: TvView) => void;
+  /** Últimas palavras ditas (o que o jogo está entendendo). Mensagem leve, separada do estado. */
+  onWords?: (text: string) => void;
   /** A TV entrou (ou recarregou) e quer o estado atual. */
   onHello?: () => void;
   onStatus?: (status: RoomStatus) => void;
@@ -31,6 +33,7 @@ export type RoomHandlers = {
 
 export type Room = {
   sendState: (view: TvView) => void;
+  sendWords: (text: string) => void;
   sendHello: () => void;
   leave: () => void;
 };
@@ -40,6 +43,7 @@ export function joinRoom(code: string, handlers: RoomHandlers): Room {
   const channel = supabase.channel(`pistache:${code}`, { config: { broadcast: { self: false } } });
   let ready = false;
   channel.on('broadcast', { event: 'state' }, ({ payload }) => handlers.onState?.(payload as TvView));
+  channel.on('broadcast', { event: 'words' }, ({ payload }) => handlers.onWords?.(String((payload as { text?: unknown })?.text ?? '')));
   channel.on('broadcast', { event: 'hello' }, () => handlers.onHello?.());
   handlers.onStatus?.('connecting');
   channel.subscribe((status, err) => {
@@ -55,6 +59,9 @@ export function joinRoom(code: string, handlers: RoomHandlers): Room {
   return {
     sendState: (view) => {
       if (ready) void channel.send({ type: 'broadcast', event: 'state', payload: view });
+    },
+    sendWords: (text) => {
+      if (ready) void channel.send({ type: 'broadcast', event: 'words', payload: { text } });
     },
     sendHello: () => {
       if (ready) void channel.send({ type: 'broadcast', event: 'hello', payload: {} });

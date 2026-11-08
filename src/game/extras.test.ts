@@ -1,14 +1,31 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { shuffle } from './deck.ts';
-import { IDLE_ADVANCE_MS, IDLE_WARN_MS, idleState } from './idle.ts';
+import { CLUE_MS, clueTimer } from './timing.ts';
+import { GOAL_OPTIONS, estimatedCards, estimatedMinutes, losePoints, stealPoints } from './board.ts';
 import type { Card } from './types.ts';
 
-test('inatividade: calmo, contagem e avanço', () => {
-  assert.deepEqual(idleState(0), { kind: 'quiet', secondsToWarn: 20 });
-  assert.deepEqual(idleState(IDLE_WARN_MS), { kind: 'countdown', secondsLeft: 10 });
-  assert.deepEqual(idleState(IDLE_ADVANCE_MS - 1), { kind: 'countdown', secondsLeft: 1 });
-  assert.deepEqual(idleState(IDLE_ADVANCE_MS), { kind: 'advance' });
+test('relógio da dica: 25 s, cores e fim', () => {
+  const t0 = clueTimer(0);
+  assert.equal(t0.secondsLeft, 25);
+  assert.equal(t0.level, 'ok');
+  assert.equal(t0.fraction, 1);
+  assert.equal(clueTimer(14_000).level, 'ok'); // 11 s restantes
+  assert.equal(clueTimer(15_000).level, 'warn'); // 10 s
+  assert.equal(clueTimer(20_000).level, 'danger'); // 5 s
+  assert.equal(clueTimer(CLUE_MS - 1).secondsLeft, 1);
+  assert.equal(clueTimer(CLUE_MS - 1).expired, false);
+  assert.equal(clueTimer(CLUE_MS).expired, true);
+  assert.equal(clueTimer(CLUE_MS + 9_000).secondsLeft, 0);
+  assert.equal(clueTimer(-5).secondsLeft, 25);
+});
+
+test('metas: de 70 a 200 e efeitos proporcionais', () => {
+  assert.deepEqual([...GOAL_OPTIONS], [70, 100, 150, 200]);
+  assert.equal(losePoints(50), 3);
+  assert.equal(stealPoints(70), 4);
+  assert.equal(stealPoints(100), 6);
+  assert.equal(losePoints(200), 12);
 });
 
 const cards = Array.from({ length: 8 }, (_, i) => ({ id: `c${i}` }) as unknown as Card);
@@ -37,4 +54,33 @@ test('baralho: cartas já jogadas vão para o fim, sem sumir', () => {
   assert.equal(deck.length, 4);
   assert.deepEqual(deck.slice(0, 2).sort(), ['a2', 'c1']);
   assert.deepEqual(deck.slice(2).sort(), ['a1', 'b1']);
+});
+
+test('estimativa de cartas e tempo cresce com a meta e com os jogadores', () => {
+  assert.ok(estimatedCards(70, 4) < estimatedCards(200, 4));
+  assert.ok(estimatedCards(100, 2) < estimatedCards(100, 8));
+  assert.ok(estimatedCards(200, 10) <= 160);
+  assert.equal(estimatedMinutes(70, 4) % 5, 0);
+  assert.equal(estimatedMinutes(70, 4), 10);
+  assert.ok(estimatedMinutes(200, 4) >= 25 && estimatedMinutes(200, 4) <= 35);
+});
+
+test('effectCard: tom, título e frases com o nome', async () => {
+  const { effectCard } = await import('./describe.ts');
+  const players = [
+    { id: 'p1', name: 'Ana', points: 0, doubleNext: false, muteNext: false },
+    { id: 'p2', name: 'Bia', points: 0, doubleNext: false, muteNext: false },
+  ];
+  assert.equal(effectCard(null, players, 'p1'), null);
+  const bad = effectCard({ kind: 'lose3', amount: 4 }, players, 'p1', 0)!;
+  assert.equal(bad.tone, 'bad');
+  assert.equal(bad.title, 'AZAR!');
+  assert.equal(bad.value, '−4');
+  assert.ok(bad.text.includes('Ana') && bad.text.includes('4'));
+  const good = effectCard({ kind: 'ladrao', amount: 3, targetId: 'p2' }, players, 'p1', 1)!;
+  assert.equal(good.tone, 'good');
+  assert.ok(good.text.includes('Ana') && good.text.includes('Bia'));
+  const bank = effectCard({ kind: 'ladrao', amount: 3 }, players, 'p1')!;
+  assert.ok(bank.text.includes('banco'));
+  assert.equal(effectCard({ kind: 'dobro' }, players, 'p1')!.value, 'x2');
 });

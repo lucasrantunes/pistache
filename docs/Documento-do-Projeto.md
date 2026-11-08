@@ -23,14 +23,14 @@ Modo de trabalho: o dono quer agrupar decisões pequenas com padrão sugerido e 
 7. Chutes livres por voz, sem ordem e sem buzzer. Ninguém vê a resposta.
 8. Validação por voz com **Deepgram** (streaming, Nova-3, português) já no MVP: o microfone do celular do operador escuta a sala, compara com a resposta e as variações aceitas, pausa a dica ao detectar o acerto e o operador toca em quem foi.
 9. Cada carta tem **20 dicas**, da mais difícil para a mais fácil.
-10. Avanço da dica, sem cronômetro fixo:
+10. *(Substituída pela decisão 69.)* Avanço da dica, sem cronômetro fixo:
     - Por voz: a palavra mágica é o nome do jogo ("Pistache"). Só ela avança; "próxima" dito em conversa não faz nada.
     - Por timer de segurança: parado por 20 s, aparece uma contagem regressiva de 10 s; aos 30 s a dica avança sozinha.
     - Pausa e retomada também por voz (palavra de comando a definir).
 11. Pontos: primeira dica vale 20 pontos, cai 1 por dica (a 20ª vale 1). Os pontos em jogo ficam visíveis na TV.
 12. Chute errado não custa nada.
 13. Se ninguém acertar as 20 dicas: a resposta é revelada e o operador escolhe quem chegou mais perto, que ganha **5 pontos**.
-14. Partida termina quando alguém chega à meta, **50 pontos por padrão** (alvo: 10 a 15 minutos). A meta pode ser mudada antes de começar.
+14. *(Substituída pela decisão 69.)* Partida termina quando alguém chega à meta, **50 pontos por padrão** (alvo: 10 a 15 minutos). A meta pode ser mudada antes de começar.
 15. Empate na meta: vence quem tiver mais pontos; se continuar empatado, uma carta de desempate.
 16. **Cartas de azar já no MVP**:
     - ~~Chance de 20% por carta e alvo sorteado~~: substituído pela decisão 26 (casas especiais do tabuleiro).
@@ -184,3 +184,8 @@ Modo de trabalho: o dono quer agrupar decisões pequenas com padrão sugerido e 
 ### Fase 1 e 2 (construção)
 67. **Fase 1 feita**: `src/game` (reduce, tabuleiro, efeitos, meta, desempate, sorteio com semente) com 15 testes; tela de texto em `src/app/index.tsx`; 3 cartas de teste em `src/content/packs/teste.json`. Testes com `node:test` (sem instalar nada; substitui o Vitest da decisão 53). Ladrão e Turbo não encadeiam outra casa; na carta de desempate não há efeito de casa; "mudo" vale na 1ª dica da próxima carta.
 68. **Fase 2 (protótipo de voz), padrão assumido**: captura com `react-native-audio-api` (`AudioRecorder.onAudioReady`, 16 kHz, mono, converter para Int16), build de desenvolvimento Android via EAS Free. Primeiro teste com a chave da Deepgram só no seu aparelho (arquivo `.env` local, fora do git); depois troca pelo token temporário da Edge Function do Supabase na mesma fase. Teste: falar "Pistache" e uma resposta e ver a detecção.
+
+### Ajuste de jogo mãos livres (Fase 3)
+69. **Novo ritmo (substitui 10 e 14).** (a) Timer fixo de **25 s por dica**, visível no celular e na TV; a fala não zera; pausa, janela "quem acertou" e microfone fora congelam; ao zerar, avança; na dica 20, "ninguém acertou". (b) "Pistache" **ou "dica"** avança (só a palavra exata; falso alarme aceito). (c) Metas **70, 100, 150, 200** (padrão 70; 300 descartada: partida de mais de 1h30 e baralho curto); azar e ladrão proporcionais à meta; aviso de tempo estimado e de "poucas cartas". (d) **Microfone aberto a partida toda**, tela sempre acesa, aviso vermelho "MICROFONE FORA" (timer parado) e opção "Jogar sem microfone". (e) A **palavra aparece grande** na TV e no celular assim que a voz ouve a resposta; o **nome falado** de quem acertou confirma em até 8 s (botões como reserva); em "ninguém acertou" o nome de quem chegou mais perto, senão ninguém. (f) "Acertou!" dura 5 s, peão **anda casa a casa** na TV, depois efeito (~6 s) e próxima carta automática. (g) **Tela de ranking removida** (o tabuleiro já mostra); fica a tela final. (h) TV mostra as **2 últimas palavras ouvidas** em caixa fixa. (i) Nomes de jogadores repetidos são bloqueados.
+71. **Correção, pop-up e sons.** (a) "Corrigir quem acertou" é só por botão (voz não troca o vencedor): o jogo guarda uma cópia antes de cada pontuação e refaz a rodada com a pessoa escolhida, desfazendo também o efeito da casa; vale para a última rodada (efeito, primeiras dicas da carta seguinte e tela final). (b) Azar e sorte têm pop-up grande na TV (ícone, título, valor, frase com o nome, duas variações), peão reage e o celular vibra. (c) A TV tem internet: sons suaves (WAV, <30 KB cada, gerados por script) são baixados ao ativar o som; a TV tenta ligar o som sozinha ao abrir e, se o navegador exigir um toque, mostra uma faixa amarela "Clique na tela para ativar o som" (qualquer clique, toque ou tecla liga). (d) Timer pulsa nos últimos 5 s com tique-taque, pontos "caem" com animação, confete no acerto e na vitória, dica entra deslizando.
+70. **Conteúdo**: categoria **Esportes** (música removida), 184 cartas (30 em cada categoria + Vôlei e 1 de teste). Cartas novas geradas por IA com revisão simples (campo `notas`); revisão completa pendente.

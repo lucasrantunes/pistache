@@ -15,8 +15,26 @@ const start = () => reduce(createInitialState(), { type: 'START', names: ['Ana',
 test('a resposta NÃO vai para a TV durante as dicas', () => {
   const v = toView(start(), extras);
   assert.equal(v.answer, null);
+  assert.equal(v.heardAnswer, null);
   assert.equal(v.clueText, 'dica 1');
   assert.ok(!JSON.stringify(v).includes('Segredo'));
+});
+
+test('a resposta vai para a TV assim que a voz ouve (heard), e o relógio para', () => {
+  const v = toView(start(), { ...extras, heard: true, timerLeftMs: 12_000 });
+  assert.equal(v.heardAnswer, 'Segredo');
+  assert.equal(v.answer, null);
+  assert.equal(v.timerMs, 12_000);
+  assert.equal(v.timerRunning, false);
+});
+
+test('relógio da TV: roda na dica, para na pausa e com o microfone fora', () => {
+  assert.equal(toView(start(), extras).timerRunning, true);
+  assert.equal(toView(start(), extras).timerMs, 25_000);
+  assert.equal(toView(start(), { ...extras, paused: true }).timerRunning, false);
+  const fora = toView(start(), { ...extras, micOut: true });
+  assert.equal(fora.micOut, true);
+  assert.equal(fora.timerRunning, false);
 });
 
 test('a resposta aparece só depois do acerto', () => {

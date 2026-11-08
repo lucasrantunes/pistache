@@ -37,6 +37,15 @@ export interface RoundResult {
   effect: Effect | null;
 }
 
+/** Cópia do jogo antes da última pontuação, para "Corrigir quem acertou". */
+export interface Undo {
+  snapshot: Omit<GameState, 'undo'>;
+  kind: 'correct' | 'closest';
+  winnerId: string | null; // quem foi marcado
+  clue: number; // dica em que foi marcado
+  gained: number;
+}
+
 export interface GameState {
   phase: Phase;
   players: Player[];
@@ -49,6 +58,7 @@ export interface GameState {
   seed: number;
   lastResult: RoundResult | null;
   winnerIds: string[];
+  undo: Undo | null; // só a última rodada pode ser corrigida
 }
 
 export type GameEvent =
@@ -56,4 +66,5 @@ export type GameEvent =
   | { type: 'NEXT_CLUE' }
   | { type: 'CORRECT'; playerId: string }
   | { type: 'CLOSEST'; playerId: string | null }
-  | { type: 'NEXT_ROUND' };
+  | { type: 'NEXT_ROUND' }
+  | { type: 'FIX_WINNER'; playerId: string }; // corrige quem acertou na última rodada

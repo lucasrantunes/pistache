@@ -10,7 +10,7 @@ const makeCards = (n: number): Card[] =>
   }));
 
 const start = (names = ['Ana', 'Bia'], cards = makeCards(5), seed = 1): GameState =>
-  reduce(createInitialState(), { type: 'START', names, cards, seed });
+  reduce(createInitialState(), { type: 'START', names, cards, seed, goal: 50 });
 
 /** Ajusta pontos e dica para montar um cenário. */
 const scenario = (points: number[], clue: number, seed = 1): GameState => {
@@ -149,4 +149,37 @@ test('acabaram as cartas: termina com quem tem mais pontos', () => {
 test('mesma semente, mesmo resultado', () => {
   const run = () => reduce(scenario([4, 0], 19, 7), { type: 'CORRECT', playerId: 'p1' });
   assert.deepEqual(run(), run());
+});
+
+test('FIX_WINNER passa os pontos de quem foi marcado por engano para quem acertou', () => {
+  let s = start(['Ana', 'Bia']);
+  s = reduce(s, { type: 'CORRECT', playerId: 'p1' });
+  const gained = s.lastResult!.gained;
+  assert.equal(s.players[0].points >= gained, true);
+  s = reduce(s, { type: 'FIX_WINNER', playerId: 'p2' });
+  assert.equal(s.players[0].points, 0);
+  assert.equal(s.players[1].points >= gained, true);
+  assert.equal(s.lastResult!.winnerId, 'p2');
+  assert.equal(s.phase === 'roundEnd' || s.phase === 'finished', true);
+});
+
+test('FIX_WINNER vale também depois de NEXT_ROUND e sem rodada anterior não faz nada', () => {
+  let s = start(['Ana', 'Bia']);
+  assert.equal(reduce(s, { type: 'FIX_WINNER', playerId: 'p2' }), s);
+  s = reduce(s, { type: 'CORRECT', playerId: 'p1' });
+  if (s.phase === 'roundEnd') s = reduce(s, { type: 'NEXT_ROUND' });
+  const fixed = reduce(s, { type: 'FIX_WINNER', playerId: 'p2' });
+  assert.equal(fixed.players[0].points, 0);
+  assert.equal(fixed.lastResult!.winnerId, 'p2');
+  assert.equal(fixed.cardIndex, 0);
+});
+
+test('FIX_WINNER desfaz o efeito da casa especial de quem foi marcado errado', () => {
+  let s = start(['Ana', 'Bia']);
+  s = { ...s, players: s.players.map((p) => (p.id === 'p1' ? { ...p, points: 100 } : p)), goal: 500 };
+  const before = s.players[0].points;
+  s = reduce(s, { type: 'CORRECT', playerId: 'p1' });
+  s = reduce(s, { type: 'FIX_WINNER', playerId: 'p2' });
+  assert.equal(s.players[0].points, before);
+  assert.equal(s.players[0].doubleNext, false);
 });

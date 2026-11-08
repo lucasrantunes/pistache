@@ -1,0 +1,48 @@
+name: Compilar iPhone (.ipa)
+
+# Para compilar: git push -f origin HEAD:build-ios
+# O .ipa aparece na aba Actions, dentro da execução, em "Artifacts".
+on:
+  push:
+    branches: [build-ios]
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar pacotes
+        run: npm ci
+
+      - name: Gerar projeto iOS
+        run: npx expo prebuild --platform ios
+
+      - name: Compilar (sem assinatura)
+        run: |
+          xcodebuild \
+            -workspace ios/pistache.xcworkspace \
+            -scheme pistache \
+            -configuration Debug \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            | tail -n 40
+
+      - name: Empacotar .ipa
+        run: |
+          mkdir Payload
+          cp -R build/Build/Products/Debug-iphoneos/pistache.app Payload/
+          zip -qr pistache.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pistache-ipa
+          path: pistache.ipa
+          retention-days: 14

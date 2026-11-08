@@ -4,8 +4,8 @@ Jogo de festa de adivinhação por dicas, para celular (iOS/Android) e TV. Idiom
 
 ## Como é o jogo
 - Cada carta tem uma resposta secreta e 20 dicas (da mais difícil à mais fácil). Dica 1 vale 20 pontos, cai 1 por dica. Chute errado não custa nada.
-- Jogadores individuais (2 a 10). Meta padrão 50 pontos (ajustável). Tabuleiro de 25 casas (casa 25 = meta). Casas especiais: azar 3, 9, 17, 23; Dobro 6; Ladrão 13; Turbo 20. O efeito vale só se o jogador **parar** na casa.
-- O celular do operador escuta por voz (Deepgram), a palavra mágica "Pistache" avança a dica. A TV é só um site de visualização (rota `tv`). Sem contas, sem anúncios e sem compras no MVP.
+- Jogadores individuais (2 a 10). Meta 70, 100, 150 ou 200 pontos (padrão 70; azar/ladrão proporcionais à meta). Tabuleiro de 25 casas (casa 25 = meta). Casas especiais: azar 3, 9, 17, 23; Dobro 6; Ladrão 13; Turbo 20. O efeito vale só se o jogador **parar** na casa.
+- Cada dica dura no máximo 25 s (timer fixo; ao fim, avança sozinha; na dica 20, "ninguém acertou"). O celular escuta por voz o tempo todo (Deepgram, tela sempre acesa): "Pistache" ou "dica" avança; a resposta dita mostra a palavra grande, e o nome falado de quem acertou confirma (botões são reserva). Fluxo mãos livres: "Acertou!" 5 s, efeito, próxima carta. Sem tela de ranking (o tabuleiro mostra). Categorias: pessoas, lugares, coisas, animais, comidas, esportes, filmes/séries. Microfone fora trava o timer e mostra aviso vermelho. "Corrigir quem acertou" (só botão) refaz a última rodada com outra pessoa (`undo` no estado, evento `FIX_WINNER`). Casas de azar/sorte abrem um pop-up na TV (`effectCard` em `src/game/describe.ts`). Sons suaves da TV: `public/sounds` (gerados por `npm run sons`), tocados por `src/scene/sound.ts` depois do botão "Ativar som". A TV é só um site de visualização (rota `tv`). Sem contas, sem anúncios e sem compras no MVP.
 
 ## Estrutura
 - `src/game`: lógica pura (sem React), `reduce(estado, evento)`. Único lugar com testes automáticos.
