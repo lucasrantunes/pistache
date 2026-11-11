@@ -54,13 +54,13 @@ export type VoiceCommand = 'advance' | 'pause' | 'resume';
 const MAGIC = 'pistache';
 
 /**
- * "Pistache" avança a dica. "Pistache, pausa" pausa. Com o jogo pausado, "Pistache" retoma.
- * A palavra "dica" (exata, sem tolerância) também avança, mas só com o jogo rodando.
+ * "Pistache" avança a pista. "Pistache, pausa" pausa. Com o jogo pausado, "Pistache" retoma.
+ * A palavra "pista" (exata, sem tolerância) também avança, mas só com o jogo rodando.
  */
 export function detectCommand(transcript: string, paused: boolean): VoiceCommand | null {
   const words = normalize(transcript).split(' ').filter(Boolean);
   const at = words.findIndex((w) => similarWord(w, MAGIC));
-  if (at < 0) return !paused && words.includes('dica') ? 'advance' : null;
+  if (at < 0) return !paused && words.includes('pista') ? 'advance' : null;
   const next = words[at + 1];
   const saidPause = next !== undefined && similarWord(next, 'pausa');
   if (paused) return saidPause ? null : 'resume';
@@ -111,4 +111,11 @@ export function nextHeard(prev: HeardWords, text: string, isFinal: boolean, coun
   const all = [...prev.done, ...words];
   const tail = all.slice(-count);
   return { done: isFinal ? all.slice(-count) : prev.done, shown: tail.join(' ') };
+}
+
+/** Quantas vezes a palavra mágica ("Pistache", ou "pista" exata) aparece no texto. */
+export function countMagicWords(transcript: string): number {
+  return normalize(transcript)
+    .split(' ')
+    .filter((w) => w !== '' && (similarWord(w, MAGIC) || w === 'pista')).length;
 }

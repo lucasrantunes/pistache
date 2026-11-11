@@ -34,11 +34,5 @@
     "nome": "Esportes",
     "rotulo": "Esporte",
     "cor": "#5cc8ff"
-  },
-  {
-    "id": "filme-serie",
-    "nome": "Filmes e séries",
-    "rotulo": "Filme/Série",
-    "cor": "#ff777b"
   }
 ]

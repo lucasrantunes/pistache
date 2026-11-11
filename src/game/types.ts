@@ -67,4 +67,5 @@ export type GameEvent =
   | { type: 'CORRECT'; playerId: string }
   | { type: 'CLOSEST'; playerId: string | null }
   | { type: 'NEXT_ROUND' }
-  | { type: 'FIX_WINNER'; playerId: string }; // corrige quem acertou na última rodada
+  | { type: 'FIX_WINNER'; playerId: string } // corrige quem acertou na última rodada
+  | { type: 'DISCARD' }; // descarta a palavra: ninguém do jogo pontua e vem a próxima carta

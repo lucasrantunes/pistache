@@ -1,5 +1,5 @@
-// Partida no celular do operador: dicas, voz, pontos e as telas do layout aprovado.
-// Mãos livres: o microfone fica aberto a partida inteira, a dica troca sozinha em 25 s e as telas
+// Partida no celular do operador: pistas, voz, pontos e as telas do layout aprovado.
+// Mãos livres: o microfone fica aberto a partida inteira, a pista troca sozinha em 25 s e as telas
 // "Acertou!" e de casa especial avançam sozinhas. Os botões continuam como reserva.
 import { useKeepAwake } from 'expo-keep-awake';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -8,29 +8,29 @@ import { Vibration } from 'react-native';
 
 import { CARTAS, CATEGORIAS } from '@/content';
 import { rotuloDaCategoria } from '@/content/catalog';
+import type { SpecialKind } from '@/game';
 import {
   CLUE_MS, DEFAULT_GOAL, MAX_GOAL, MIN_GOAL, buildDeck, cluePoints, clueTimer, createInitialState, currentCard,
   effectCard, rankRows, reduce,
 } from '@/game';
-import type { SpecialKind } from '@/game';
-import { joinRoom } from '@/realtime/room';
 import type { Room, RoomStatus } from '@/realtime/room';
-import { toView } from '@/realtime/view';
+import { joinRoom } from '@/realtime/room';
 import type { TvScreen, TvView } from '@/realtime/view';
+import { toView } from '@/realtime/view';
 import { markPlayed, playedIdsOf } from '@/storage/played';
-import { useVoiceSession } from '@/voice/session';
-import { detectCommand, matchPlayerName, matchesAnswer, nextHeard } from '@/voice/text';
-import type { HeardWords } from '@/voice/text';
 import { Btn, Screen, T } from '@/ui/kit';
-import { AnswerScreen, ConnectScreen, EffectScreen, FinalScreen, FixScreen, RevealScreen, RoundScreen, WhoScreen } from '@/ui/phone';
 import type { UiPlayer } from '@/ui/phone';
+import { AnswerScreen, ConnectScreen, EffectScreen, ExitScreen, FinalScreen, FixScreen, RevealScreen, RoundScreen, WhoScreen } from '@/ui/phone';
 import { colorOf } from '@/ui/ranking';
 import { C, PLAYER_COLORS } from '@/ui/theme';
+import { useVoiceSession } from '@/voice/session';
+import type { HeardWords } from '@/voice/text';
+import { detectCommand, matchPlayerName, matchesAnswer, nextHeard } from '@/voice/text';
 
 /** Depois de uma carta: "Acertou!" -> efeito da casa (se houver) -> próxima carta. Só da tela; as regras ficam no reducer. */
 type Step = 'answer' | 'effect' | 'final';
 
-/** Depois de ouvir a resposta (ou o fim das dicas), quanto tempo se ignora a mesma palavra se foi engano. */
+/** Depois de ouvir a resposta (ou o fim das pistas), quanto tempo se ignora a mesma palavra se foi engano. */
 const COOLDOWN_MS = 4000;
 /** A TV recebe as últimas palavras no máximo a cada tanto (para não piscar). */
 const WORDS_EVERY_MS = 350;
@@ -55,12 +55,15 @@ export default function Jogo() {
   });
 
   const [paused, setPaused] = useState(false);
+  const [guesses, setGuesses] = useState<string[]>([]); // palpites errados ditos na carta (a TV mostra os 3 últimos)
   const [heard, setHeard] = useState<string | null>(null); // a voz ouviu a resposta; falta dizer quem acertou
   const [picking, setPicking] = useState(false); // "Alguém acertou!" tocado à mão
   const [step, setStep] = useState<Step>('answer');
   const [startPoints, setStartPoints] = useState<Record<string, number>>({});
   const [leftMs, setLeftMs] = useState(CLUE_MS);
   const [noMic, setNoMic] = useState(false); // "Jogar sem microfone"
+  const [leaving, setLeaving] = useState(false); // confirmação de "Sair"
+  const [micOutShown, setMicOutShown] = useState(false); // aviso de microfone, sem piscar
   const [tvStatus, setTvStatus] = useState<RoomStatus>('connecting');
   const [roomCode, setRoomCode] = useState(params.room ?? '');
   const [connecting, setConnecting] = useState(false); // tela "Conectar a TV"
@@ -74,7 +77,7 @@ export default function Jogo() {
   const pickingRef = useRef(picking);
   const connectingRef = useRef(connecting);
   const runningRef = useRef(false);
-  const elapsed = useRef(0); // ms de dica já corridos (sem contar pausas)
+  const elapsed = useRef(0); // ms de pista já corridos (sem contar pausas)
   const lastTick = useRef(Date.now());
   const ignoreAnswerUntil = useRef(0);
   const micWasOn = useRef(false);
@@ -98,6 +101,13 @@ export default function Jogo() {
       w.at = Date.now();
       room.current?.sendWords(text);
     }, Math.max(0, WORDS_EVERY_MS - (Date.now() - w.at)));
+  };
+
+  const addGuess = (text: string) => {
+    const phrase = text.replace(/[.,!?;:…]+/g, ' ').split(/\s+/).filter(Boolean).slice(0, 4).join(' ');
+    if (phrase.length < 2) return;
+    const shown = phrase.charAt(0).toLocaleUpperCase('pt-BR') + phrase.slice(1);
+    setGuesses((g) => (g[g.length - 1]?.toLocaleLowerCase('pt-BR') === shown.toLocaleLowerCase('pt-BR') ? g : [...g, shown].slice(-5)));
   };
 
   const voice = useVoiceSession((text, isFinal) => {
@@ -131,21 +141,28 @@ export default function Jogo() {
     if (cmd === 'advance') dispatch({ type: 'NEXT_CLUE' });
     else if (cmd === 'pause') setPaused(true);
     else if (cmd === 'resume') setPaused(false);
+    else if (!pausedRef.current && !nameIn()) addGuess(text); // fala final que não é resposta nem comando: palpite errado
   });
   const { start: startVoice, stop: stopVoice } = voice;
 
+  // "Jogar sem microfone": a voz é fechada e não volta a tentar (nem a dar erro) até o fim da partida.
   useEffect(() => {
+    if (noMic) return;
     startVoice();
     return () => { void stopVoice(); };
-  }, [startVoice, stopVoice]);
+  }, [startVoice, stopVoice, noMic]);
 
   if (voice.status === 'on') micWasOn.current = true;
-  // Microfone fora: erro, ou reconectando depois de já ter funcionado. A dica fica parada até voltar.
-  const micFailing = voice.status === 'error' || (voice.status === 'connecting' && micWasOn.current);
-  const micOut = micFailing && !noMic;
-  useEffect(() => { if (voice.status === 'on') setNoMic(false); }, [voice.status]);
+  // Microfone fora: erro, ou reconectando depois de já ter funcionado. A pista fica parada até voltar.
+  const micFailing = !noMic && (voice.status === 'error' || (voice.status === 'connecting' && micWasOn.current));
+  // O aviso só aparece depois de 3 s de falha e só some depois de 3 s estável: sem piscar e com o botão sempre ao alcance.
+  useEffect(() => {
+    const id = setTimeout(() => setMicOutShown(micFailing), 3000);
+    return () => clearTimeout(id);
+  }, [micFailing]);
+  const micOut = micOutShown && !noMic;
 
-  // ---- Relógio da dica: 25 s, a fala não zera ----
+  // ---- Relógio da pista: 25 s, a fala não zera ----
   const running = state.phase === 'clue' && !paused && !choosing && !micOut;
   useEffect(() => {
     stateRef.current = state; pausedRef.current = paused; heardRef.current = heard;
@@ -186,6 +203,7 @@ export default function Jogo() {
   // Carta nova: o quadro de palavras da TV começa limpo.
   useEffect(() => {
     wordsRef.current = { done: [], shown: '' };
+    setGuesses([]);
     scheduleWords();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.cardIndex]);
@@ -200,7 +218,7 @@ export default function Jogo() {
   const sendCurrent = (r: Room) => {
     const v = viewRef.current;
     if (!v) return;
-    // A TV conta o tempo sozinha: ao reenviar, o valor tem de ser o de agora, não o de quando a dica começou.
+    // A TV conta o tempo sozinha: ao reenviar, o valor tem de ser o de agora, não o de quando a pista começou.
     r.sendState({ ...v, timerMs: v.timerRunning ? Math.max(0, CLUE_MS - elapsed.current) : v.timerMs });
     r.sendWords(wordsRef.current.shown);
   };
@@ -231,19 +249,20 @@ export default function Jogo() {
   }, [step, effectTone]);
 
   const order = state.players.map((p) => p.id);
-  // O tempo que a TV recebe é uma foto de quando algo muda (dica nova, pausa, retomada); ela conta sozinha daí.
+  // O tempo que a TV recebe é uma foto de quando algo muda (pista nova, pausa, retomada); ela conta sozinha daí.
   const viewLeftMs = useMemo(() => Math.round(Math.max(0, CLUE_MS - elapsed.current) / 100) * 100,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state.clue, state.cardIndex, state.phase, running]);
   const micOutForTv = micOut && (state.phase === 'clue' || state.phase === 'noWinner');
   const view = toView(state, {
     categoryLabel: state.cards.length ? rotuloDaCategoria(CATEGORIAS, currentCard(state).categoria) : '',
-    paused, heard: heard !== null, micOut: micOutForTv, timerLeftMs: viewLeftMs, guesses: [], colors: PLAYER_COLORS, startPoints, screen: tvScreen, corrected,
+    paused, heard: heard !== null, micOut: micOutForTv, timerLeftMs: viewLeftMs, guesses, colors: PLAYER_COLORS, startPoints, screen: tvScreen, corrected,
   });
   const viewJson = JSON.stringify(view);
   useEffect(() => {
     viewRef.current = view;
-    room.current?.sendState(view);
+    // A TV conta o tempo sozinha a partir do valor recebido: sempre mandar o de agora (um palpite novo reenvia o estado e não pode zerar o tempo).
+    room.current?.sendState({ ...view, timerMs: view.timerRunning ? Math.max(0, CLUE_MS - elapsed.current) : view.timerMs });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewJson]);
 
@@ -270,10 +289,12 @@ export default function Jogo() {
     setHeard(null);
     dispatch({ type: 'NEXT_ROUND' });
   };
-  const playAgain = () => {
-    const seed = Date.now() % 2147483647;
-    setStep('answer'); setPaused(false); setHeard(null); setPicking(false); setStartPoints({});
-    dispatch({ type: 'START', names: state.players.map((p) => p.name), goal: state.goal, cards: buildDeck(CARTAS, cats, seed, playedIdsOf(state.players.map((p) => p.name))), seed });
+  // Volta ao lobby já preenchido (jogadores, categorias, meta e sala); quem aperta "Começar partida" é a pessoa.
+  const toLobby = () => router.replace({ pathname: '/', params: { names: JSON.stringify(state.players.map((p) => p.name)), goal: String(state.goal), cats: JSON.stringify(cats), room: roomCode } } as never);
+  // Encerrar: avisa a TV, que sai do jogo, e o host volta ao lobby.
+  const leaveForAll = () => {
+    room.current?.sendEnd();
+    setTimeout(toLobby, 350);
   };
   const openFix = () => setFixing(true);
   const pickFix = (id: string) => {
@@ -284,13 +305,15 @@ export default function Jogo() {
     setStep('answer'); setCorrected(true);
     dispatch({ type: 'FIX_WINNER', playerId: id });
   };
+  // Descartar a palavra: Ninguém pontua (o que já foi marcado é desfeito) e vem a próxima carta.
+  const discardWord = () => { setCorrected(false); setHeard(null); setPicking(false); setPaused(false); setFixing(false); setStep('answer'); dispatch({ type: 'DISCARD' }); };
   const afterAnswer = () => { if (effect) setStep('effect'); else nextCard(); };
 
   if (!card) {
     return (
       <Screen>
         <T size={18}>Faltam jogadores ou cartas.</T>
-        <Btn label="Voltar" onPress={() => router.replace('/')} />
+        <Btn label="Voltar" onPress={toLobby} />
       </Screen>
     );
   }
@@ -298,12 +321,15 @@ export default function Jogo() {
   const timer = clueTimer(CLUE_MS - leftMs);
   const mic = { out: micOut, onPlayWithout: () => setNoMic(true) };
   const voiceLine =
-    voice.status === 'on' ? (paused ? 'Pausado' : 'Ouvindo a sala')
+    noMic ? 'Sem microfone · use os botões'
+      : voice.status === 'on' ? (paused ? 'Pausado' : 'Ouvindo a sala')
       : voice.status === 'connecting' ? 'Conectando o microfone…'
       : voice.status === 'error' ? `Sem voz (${voice.error}). Use os botões.`
       : 'Microfone desligado';
-  const voiceColor = voice.status === 'on' && !paused ? C.green : voice.status === 'error' ? C.red : C.muted;
+  const voiceColor = noMic ? C.muted : voice.status === 'on' && !paused ? C.green : voice.status === 'error' ? C.red : C.muted;
   const nextLabel = state.phase === 'finished' ? 'Ver o vencedor' : state.tiebreakIds ? 'Carta de desempate' : 'Próxima carta';
+
+  if (leaving) return <ExitScreen onStay={() => setLeaving(false)} onLeave={leaveForAll} />;
 
   // ---- Corrigir quem acertou ----
   const undoInfo = state.undo;
@@ -322,7 +348,7 @@ export default function Jogo() {
   }
   const canFix = Boolean(undoInfo && undoInfo.winnerId);
   const lastLine = fixOf && undoInfo && state.phase === 'clue' && state.cardIndex > undoInfo.snapshot.cardIndex && state.clue <= 4
-    ? `Última: ${fixOf.name} acertou na dica ${undoInfo.clue}, +${undoInfo.gained}` : undefined;
+    ? `Última: ${fixOf.name} acertou na pista ${undoInfo.clue}, +${undoInfo.gained}` : undefined;
 
   // ---- Rodada ----
   if (state.phase === 'clue') {
@@ -330,7 +356,7 @@ export default function Jogo() {
       return <ConnectScreen current={roomCode} onConnect={(c) => { setRoomCode(c); closeConnect(); }} onCancel={closeConnect} />;
     }
     if (choosing) {
-      return <WhoScreen answer={heard !== null ? card.resposta : null} clue={state.clue} points={cluePoints(state.clue)} players={eligible} mic={mic} onPick={pickCorrect} onCancel={closeWho} />;
+      return <WhoScreen answer={heard !== null ? card.resposta : null} clue={state.clue} points={cluePoints(state.clue)} players={eligible} mic={mic} onPick={pickCorrect} onCancel={closeWho} onDiscard={discardWord} />;
     }
     return (
       <RoundScreen
@@ -340,6 +366,7 @@ export default function Jogo() {
         clue={state.clue}
         points={cluePoints(state.clue)}
         hint={card.dicas[state.clue - 1]}
+        noMic={noMic}
         mutedNames={state.players.filter((p) => state.muted.includes(p.id)).map((p) => p.name)}
         voiceLine={voiceLine}
         voiceColor={voiceColor}
@@ -354,7 +381,7 @@ export default function Jogo() {
         onPause={() => setPaused(!paused)}
         onSkip={() => dispatch({ type: 'NEXT_CLUE' })}
         onSomeoneGotIt={openWho}
-        onExit={() => router.replace('/')}
+        onExit={() => setLeaving(true)}
         onRoomPress={openConnect}
       />
     );
@@ -384,9 +411,9 @@ export default function Jogo() {
         rows={rankRows(state.players, {}, state.goal)}
         order={order}
         goal={state.goal}
-        onAgain={playAgain}
-        onChange={() => router.replace('/')}
+        onAgain={toLobby}
         onFix={canFix ? openFix : undefined}
+        onDiscard={canFix ? discardWord : undefined}
       />
     );
   }
@@ -411,6 +438,7 @@ export default function Jogo() {
         nextLabel={nextLabel}
         onNext={nextCard}
         onFix={canFix ? openFix : undefined}
+        onDiscard={canFix ? discardWord : undefined}
       />
     );
   }
@@ -428,6 +456,7 @@ export default function Jogo() {
         nextLabel={effect ? 'Casa especial!' : nextLabel}
         onNext={afterAnswer}
         onFix={canFix ? openFix : undefined}
+        onDiscard={canFix ? discardWord : undefined}
       />
     );
   }

@@ -17,7 +17,6 @@ export const AUTO_SECONDS = {
   /** Casa especial (azar, dobro, ladrão, turbo): tempo de rir e ler. */
   effect: 6,
   /** Fim de jogo: começa outra partida com os mesmos jogadores. */
-  playAgain: 30,
 } as const;
 
 export type ClueLevel = 'ok' | 'warn' | 'danger';

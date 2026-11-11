@@ -12,6 +12,7 @@ export type VoiceStatus = 'off' | 'connecting' | 'on' | 'error';
 
 const DEV_KEY = process.env.EXPO_PUBLIC_DEEPGRAM_KEY ?? '';
 const RETRY_MS = 2000;
+const RETRY_MAX_MS = 10000;
 
 export function useVoiceSession(onText: (text: string, isFinal: boolean) => void) {
   const [status, setStatus] = useState<VoiceStatus>('off');
@@ -22,6 +23,7 @@ export function useVoiceSession(onText: (text: string, isFinal: boolean) => void
   const wanted = useRef(false);
   const busy = useRef(false);
   const retry = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const attempts = useRef(0);
   const beginRef = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => {
@@ -48,9 +50,10 @@ export function useVoiceSession(onText: (text: string, isFinal: boolean) => void
       await teardown();
       if (wanted.current) {
         clearTimeout(retry.current);
+        attempts.current += 1;
         retry.current = setTimeout(() => {
           if (wanted.current) void beginRef.current();
-        }, RETRY_MS);
+        }, Math.min(RETRY_MAX_MS, RETRY_MS * attempts.current));
       }
     },
     [teardown],
@@ -79,6 +82,7 @@ export function useVoiceSession(onText: (text: string, isFinal: boolean) => void
             conn = openDeepgram(auth, sampleRate, {
               onOpen: () => {
                 busy.current = false;
+                attempts.current = 0;
                 setStatus('on');
               },
               onTranscript: (t, f) => onTextRef.current(t, f),
@@ -111,6 +115,7 @@ export function useVoiceSession(onText: (text: string, isFinal: boolean) => void
 
   const start = useCallback(() => {
     wanted.current = true;
+    attempts.current = 0;
     void begin();
   }, [begin]);
 

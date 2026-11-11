@@ -183,3 +183,50 @@ test('FIX_WINNER desfaz o efeito da casa especial de quem foi marcado errado', (
   assert.equal(s.players[0].points, before);
   assert.equal(s.players[0].doubleNext, false);
 });
+
+test('DISCARD na carta em jogo pula para a próxima sem pontos para ninguém', () => {
+  let s = start(['Ana', 'Bia']);
+  s = { ...s, clue: 7 };
+  s = reduce(s, { type: 'DISCARD' });
+  assert.equal(s.phase, 'clue');
+  assert.equal(s.cardIndex, 1);
+  assert.equal(s.clue, 1);
+  assert.deepEqual(s.players.map((p) => p.points), [0, 0]);
+  assert.equal(s.lastResult, null);
+});
+
+test('DISCARD depois de pontuar desfaz os pontos e o efeito e vem a próxima carta', () => {
+  let s = start(['Ana', 'Bia']);
+  s = { ...s, players: s.players.map((p) => (p.id === 'p1' ? { ...p, points: 100 } : p)), goal: 500 };
+  s = reduce(s, { type: 'CORRECT', playerId: 'p1' });
+  assert.equal(s.phase, 'roundEnd');
+  s = reduce(s, { type: 'DISCARD' });
+  assert.equal(s.phase, 'clue');
+  assert.equal(s.cardIndex, 1);
+  assert.equal(s.players[0].points, 100);
+  assert.equal(s.players[0].doubleNext, false);
+  assert.equal(s.undo, null);
+});
+
+test('DISCARD na última carta termina a partida; depois da meta, desfaz e a partida segue', () => {
+  const last = { ...start(['Ana', 'Bia'], makeCards(1)), clue: 3 };
+  const fim = reduce(last, { type: 'DISCARD' });
+  assert.equal(fim.phase, 'finished');
+  assert.equal(fim.lastResult, null);
+
+  let s = start(['Ana', 'Bia']);
+  s = { ...s, players: s.players.map((p) => (p.id === 'p1' ? { ...p, points: 49 } : p)), clue: 1 };
+  s = reduce(s, { type: 'CORRECT', playerId: 'p1' });
+  assert.equal(s.phase, 'finished');
+  s = reduce(s, { type: 'DISCARD' });
+  assert.equal(s.phase, 'clue');
+  assert.equal(s.players[0].points, 49);
+  assert.deepEqual(s.winnerIds, []);
+});
+
+test('DISCARD sem carta em jogo nem pontuação para desfazer não faz nada', () => {
+  const s = start(['Ana', 'Bia']);
+  const r = reduce(s, { type: 'CORRECT', playerId: 'p1' });
+  const semUndo = { ...r, undo: null };
+  assert.equal(reduce(semUndo, { type: 'DISCARD' }), semUndo);
+});

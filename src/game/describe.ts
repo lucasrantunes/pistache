@@ -20,7 +20,7 @@ export function effectCard(e: Effect | null, players: Player[], winnerId: string
         text: v ? `${me} tropeçou e perde ${e.amount} pontos.` : `Ops! ${me} perde ${e.amount} pontos.` };
     case 'mute':
       return { tone: 'bad', icon: '🤐', title: 'AZAR!', value: '',
-        text: v ? `Boca fechada! ${me} não chuta na primeira dica da próxima carta.` : `Silêncio! ${me} fica mudo na primeira dica da próxima carta.` };
+        text: v ? `Boca fechada! ${me} não chuta na primeira pista da próxima carta.` : `Silêncio! ${me} fica mudo na primeira pista da próxima carta.` };
     case 'swapLast':
       return { tone: 'bad', icon: '🔄', title: 'AZAR!', value: '',
         text: v ? `Virou a mesa! ${me} e ${name(e.targetId)} trocam de pontos.` : `Troca! ${me} e ${name(e.targetId)} trocam de pontos.` };

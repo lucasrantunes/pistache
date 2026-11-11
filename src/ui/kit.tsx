@@ -4,8 +4,7 @@ import { AppState, Pressable, ScrollView, Text, View } from 'react-native';
 import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { animalDe, Rosto } from './animais';
-import { C, F, PLAYER_COLORS } from './theme';
+import { C, F } from './theme';
 
 export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
   return (
@@ -92,27 +91,21 @@ export function Btn({
   );
 }
 
-// ---------- Medalha do jogador (decisão 47: bichinho, como no Pitaco) ----------
+// ---------- Medalha do jogador: letra inicial dentro de um círculo na cor do jogador ----------
 
-/**
- * Medalha: anel na cor do jogador e rosto de bichinho. Cada cor tem um bicho (o mesmo durante a partida).
- * `sad` = carinha triste (casa de azar); `leader` = coroa.
- */
+/** `sad` = apagada (jogador mudo por azar); `leader` = coroa. */
 export function Medal({
   name, color, size = 44, leader = false, sad = false,
 }: { name: string; color: string; size?: number; leader?: boolean; sad?: boolean }) {
   const ring = Math.max(2, size * 0.07);
-  const inner = size - ring * 2;
-  const animal = animalDe(PLAYER_COLORS.indexOf(color), name);
+  const letter = (name.trim()[0] ?? '?').toLocaleUpperCase('pt-BR');
   return (
-    <View style={{ width: size, height: size }} accessibilityLabel={name}>
+    <View style={{ width: size, height: size, opacity: sad ? 0.55 : 1 }} accessibilityLabel={name}>
       {leader ? (
         <Text style={{ position: 'absolute', top: -size * 0.32, left: 0, right: 0, textAlign: 'center', fontSize: size * 0.37, lineHeight: size * 0.43, color: C.yellow, zIndex: 2 }}>♛</Text>
       ) : null}
-      <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color, padding: ring }}>
-        <View style={{ width: inner, height: inner, borderRadius: inner / 2, overflow: 'hidden' }}>
-          <Rosto animal={animal} triste={sad} tamanho={inner} />
-        </View>
+      <View style={{ width: size, height: size, borderRadius: size / 2, borderWidth: ring, borderColor: color, backgroundColor: color + '33', alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ fontFamily: F.brand, fontSize: size * 0.46, lineHeight: size * 0.6, color: C.ink }}>{letter}</Text>
       </View>
     </View>
   );

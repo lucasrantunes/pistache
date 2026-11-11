@@ -1,167 +1,306 @@
-// Protótipo de voz (Fase 2): escuta o microfone, mostra o que a Deepgram entendeu e detecta
-// a palavra mágica e a resposta. Tela provisória, só para testar.
+// Teste de voz (Fase 2): compara a Deepgram com o reconhecimento nativo do aparelho.
+// Mostra o texto entendido, a tecnologia em uso e um placar (acertos, falsos avanços, atraso).
+// Tela provisória, só para testar.
+import * as Device from 'expo-device';
 import { Link } from 'expo-router';
-import { useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Platform, Pressable, ScrollView, Share, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import pack from '@/content/packs/teste.json';
-import { openDeepgram } from '@/voice/deepgram';
-import type { DeepgramAuth, DeepgramConnection } from '@/voice/deepgram';
-import { fetchVoiceToken, hasVoiceServer } from '@/voice/token';
-import { startMic } from '@/voice/mic';
-import type { Mic } from '@/voice/mic';
-import { detectCommand, matchesAnswer } from '@/voice/text';
-import { VoiceActivityGate, splitFrames } from '@/voice/voice-activity';
+import { createDeepgramEngine } from '@/voice/deepgram-engine';
+import type { EngineHandlers, EngineId, EngineStats, EngineStatus, InfoRow, VoiceEngine } from '@/voice/engine';
+import { matchProbe } from '@/voice/metrics';
+import type { ProbeResult } from '@/voice/metrics';
+import { createNativeEngine } from '@/voice/native-engine';
+import { countMagicWords, detectCommand, matchesAnswer } from '@/voice/text';
 
-type Status = 'parado' | 'conectando' | 'ouvindo';
-type Line = { id: number; text: string; note: string };
+type Tone = 'normal' | 'ok' | 'warn' | 'bad';
+type LogLine = { id: number; t: number; text: string; tone: Tone };
 
-const KEY = process.env.EXPO_PUBLIC_DEEPGRAM_KEY ?? '';
 const cards = pack.cartas;
+const TONE_COLOR: Record<Tone, string> = { normal: '#f4efff', ok: '#39e58c', warn: '#ffca4b', bad: '#ff777b' };
+const STATUS_LABEL: Record<EngineStatus, string> = {
+  off: 'parado',
+  connecting: 'conectando',
+  on: 'ouvindo',
+  restarting: 'reiniciando a escuta',
+  error: 'erro',
+};
+
+function Btn({ label, onPress, color = '#372762', dark = false }: { label: string; onPress: () => void; color?: string; dark?: boolean }) {
+  return (
+    <Pressable onPress={onPress} style={{ backgroundColor: color, padding: 14, borderRadius: 14, marginVertical: 4 }}>
+      <Text style={{ color: dark ? '#130d2f' : '#f4efff', fontSize: 17, fontWeight: '800', textAlign: 'center' }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function T({ children, c = '#f4efff', s = 16, b = false }: { children: React.ReactNode; c?: string; s?: number; b?: boolean }) {
+  return <Text style={{ color: c, fontSize: s, fontWeight: b ? '800' : '500', marginVertical: 3 }}>{children}</Text>;
+}
+
+function Box({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={{ marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: '#211747' }}>
+      <T c="#b8abdc" s={13}>{title}</T>
+      {children}
+    </View>
+  );
+}
+
+const seconds = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+
+function probeText(r: ProbeResult): string {
+  const lag = r.avgMs === null ? '—' : `${r.avgMs} ms (máx ${r.maxMs} ms)`;
+  return `acertos ${r.hits}/${r.attempts} · falsos avanços ${r.falsePositives} · atraso médio ${lag}`;
+}
 
 export default function Voz() {
-  const [status, setStatus] = useState<Status>('parado');
+  const [engineId, setEngineId] = useState<EngineId>('native');
+  const [onDevice, setOnDevice] = useState(false);
+  const [hints, setHints] = useState(true);
+  const [gateOn, setGateOn] = useState(true);
+  const [status, setStatus] = useState<EngineStatus>('off');
   const [error, setError] = useState('');
   const [interim, setInterim] = useState('');
-  const [lines, setLines] = useState<Line[]>([]);
+  const [log, setLog] = useState<LogLine[]>([]);
   const [paused, setPaused] = useState(false);
   const [cardIndex, setCardIndex] = useState(0);
-  const [rate, setRate] = useState(0);
-  const [seconds, setSeconds] = useState(0);
-  const mic = useRef<Mic | null>(null);
-  const dg = useRef<DeepgramConnection | null>(null);
-  const pausedRef = useRef(false);
-  const cardRef = useRef(0);
+  const [rows, setRows] = useState<InfoRow[]>([]);
+  const [stats, setStats] = useState<EngineStats | null>(null);
+  const [, setTick] = useState(0);
+
+  const engine = useRef<VoiceEngine | null>(null);
+  const startedAt = useRef(0);
   const nextId = useRef(1);
-  const sentSamples = useRef(0);
-  const capturedSamples = useRef(0);
-  const gate = useRef(new VoiceActivityGate());
-  const gateOn = useRef(true);
-  const [useGate, setUseGate] = useState(true);
-  const [captured, setCaptured] = useState(0);
+  const cardRef = useRef(0);
+  const pausedRef = useRef(false);
+  const magicSeen = useRef(0);
+  const answerSeen = useRef(false);
+  const magicAttempts = useRef<number[]>([]);
+  const magicDetections = useRef<number[]>([]);
+  const answerAttempts = useRef<number[]>([]);
+  const answerDetections = useRef<number[]>([]);
   cardRef.current = cardIndex;
 
-  const addLine = (text: string, note: string) =>
-    setLines((l) => [{ id: nextId.current++, text, note }, ...l].slice(0, 30));
+  const refresh = () => setTick((n) => n + 1);
 
-  const onTranscript = (text: string, isFinal: boolean) => {
-    const card = cards[cardRef.current];
-    const command = detectCommand(text, pausedRef.current);
-    const hit = matchesAnswer(text, card.resposta, card.aliases);
-    if (!isFinal) {
-      setInterim(text + (command ? `  [${command}?]` : '') + (hit ? '  [ACERTO?]' : ''));
-      return;
-    }
-    setInterim('');
-    let note = '';
-    if (command === 'pause') { pausedRef.current = true; setPaused(true); note = 'PAUSA'; }
-    else if (command === 'resume') { pausedRef.current = false; setPaused(false); note = 'RETOMA'; }
-    else if (command === 'advance') note = 'AVANÇA DICA';
-    if (hit) note += (note ? ' + ' : '') + 'ACERTOU';
-    addLine(text, note);
+  const addLog = (text: string, tone: Tone = 'normal') =>
+    setLog((l) => [{ id: nextId.current++, t: startedAt.current ? Date.now() - startedAt.current : 0, text, tone }, ...l].slice(0, 300));
+
+  const handlers: EngineHandlers = {
+    onStatus: (s) => setStatus(s),
+    onError: (m) => {
+      setError(m);
+      addLog(m, 'bad');
+    },
+    onNote: (m) => addLog(m, 'warn'),
+    onSession: () => {
+      magicSeen.current = 0;
+      answerSeen.current = false;
+      setInterim('');
+    },
+    onText: (text, isFinal) => {
+      const now = Date.now();
+      const kind = isFinal ? 'final' : 'parcial';
+      // Palavra mágica: conta cada aparição nova (o texto parcial repete o que já foi dito).
+      const n = countMagicWords(text);
+      if (n > magicSeen.current) {
+        magicSeen.current = n;
+        magicDetections.current.push(now);
+        addLog(`PISTACHE detectado (${kind})`, 'ok');
+        refresh();
+      }
+      const card = cards[cardRef.current];
+      if (!answerSeen.current && matchesAnswer(text, card.resposta, card.aliases)) {
+        answerSeen.current = true;
+        answerDetections.current.push(now);
+        addLog(`RESPOSTA detectada (${kind})`, 'ok');
+        refresh();
+      }
+      if (!isFinal) {
+        setInterim(text);
+        return;
+      }
+      setInterim('');
+      // Pausa e retoma só valem no texto final (como na Deepgram).
+      const command = detectCommand(text, pausedRef.current);
+      if (command === 'pause') {
+        pausedRef.current = true;
+        setPaused(true);
+        addLog('comando PAUSA (final)', 'warn');
+      } else if (command === 'resume') {
+        pausedRef.current = false;
+        setPaused(false);
+        addLog('comando RETOMA (final)', 'warn');
+      }
+      addLog(`“${text}”`);
+      magicSeen.current = 0;
+      answerSeen.current = false;
+    },
   };
+
+  const hintWords = () => (hints ? ['Pistache', 'pausa', ...cards.map((c) => c.resposta)] : []);
+
+  const makeEngine = (): VoiceEngine =>
+    engineId === 'deepgram' ? createDeepgramEngine(handlers) : createNativeEngine(handlers, { onDevice, hints: hintWords() });
+
+  // Tabela "Tecnologia em uso" já antes de começar (mostra, por exemplo, se o módulo nativo não está instalado).
+  useEffect(() => {
+    if (status !== 'off') return;
+    let alive = true;
+    const preview = engineId === 'deepgram' ? createDeepgramEngine(handlers) : createNativeEngine(handlers, { onDevice, hints: hintWords() });
+    preview.setSilenceFilter?.(gateOn);
+    void preview.describe().then((r) => alive && setRows(r));
+    return () => {
+      alive = false;
+    };
+    // handlers muda a cada render e não faz parte da escolha; só as opções importam.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engineId, onDevice, hints, gateOn, status]);
+
+  useEffect(() => {
+    if (status === 'off') return;
+    const id = setInterval(() => {
+      setStats(engine.current?.stats() ?? null);
+      refresh();
+    }, 1000);
+    return () => clearInterval(id);
+  }, [status]);
 
   const start = async () => {
     setError('');
-    if (!KEY && !hasVoiceServer()) { setError('Falta configurar o .env.local (Supabase ou chave)'); return; }
-    setStatus('conectando');
-    let auth: DeepgramAuth;
+    pausedRef.current = false;
+    setPaused(false);
+    startedAt.current = Date.now();
+    const e = makeEngine();
+    e.setSilenceFilter?.(gateOn);
+    engine.current = e;
+    addLog(`Começou: ${engineId === 'deepgram' ? 'Deepgram' : `Nativo (${onDevice ? 'no aparelho' : 'padrão do sistema'}, dicas ${hints ? 'ligadas' : 'desligadas'})`}`, 'warn');
     try {
-      auth = hasVoiceServer() ? { kind: 'bearer', value: await fetchVoiceToken() } : { kind: 'key', value: KEY };
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setStatus('parado');
-      return;
-    }
-    sentSamples.current = 0;
-    capturedSamples.current = 0;
-    gate.current = new VoiceActivityGate();
-    setSeconds(0);
-    setCaptured(0);
-    let connection: DeepgramConnection | null = null;
-    try {
-      mic.current = await startMic({
-        onAudio: (pcm, sampleRate) => {
-          if (!connection) {
-            setRate(sampleRate);
-            connection = openDeepgram(auth, sampleRate, {
-              onOpen: () => setStatus('ouvindo'),
-              onTranscript,
-              onClose: (r) => { setError(`Conexão ${r}`); void stop(); },
-              onError: (m) => setError(m),
-            });
-            dg.current = connection;
-          }
-          capturedSamples.current += pcm.byteLength / 2;
-          setCaptured(Math.round(capturedSamples.current / sampleRate));
-          for (const { frame, rms } of splitFrames(pcm, sampleRate)) {
-            if (!gateOn.current) {
-              sentSamples.current += frame.byteLength / 2;
-              connection.sendAudio(frame);
-              continue;
-            }
-            const r = gate.current.push(frame, rms);
-            for (const f of r.send) {
-              sentSamples.current += f.byteLength / 2;
-              connection.sendAudio(f);
-            }
-            if (r.finalize) connection.finalize();
-          }
-          setSeconds(Math.round(sentSamples.current / sampleRate));
-        },
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setStatus('parado');
+      await e.start();
+      setRows(await e.describe());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      addLog(message, 'bad');
+      setStatus('error');
     }
   };
 
   const stop = async () => {
-    dg.current?.close();
-    dg.current = null;
-    const m = mic.current;
-    mic.current = null;
-    try { await m?.stop(); } catch { /* já parado */ }
-    setStatus('parado');
+    await engine.current?.stop();
+    setStats(engine.current?.stats() ?? null);
+    addLog('Parou', 'warn');
   };
 
+  const mark = (list: React.RefObject<number[]>, label: string) => {
+    list.current.push(Date.now());
+    addLog(`Marcado: disse ${label}`, 'warn');
+    refresh();
+  };
+
+  const resetScore = () => {
+    magicAttempts.current = [];
+    magicDetections.current = [];
+    answerAttempts.current = [];
+    answerDetections.current = [];
+    setLog([]);
+    refresh();
+  };
+
+  const active = status !== 'off' && status !== 'error';
+  const magic = matchProbe(magicAttempts.current, magicDetections.current);
+  const answer = matchProbe(answerAttempts.current, answerDetections.current);
+  const elapsed = startedAt.current && active ? seconds(Date.now() - startedAt.current) : '—';
+  const device = `${Device.modelName ?? 'aparelho'} · ${Device.osName ?? Platform.OS} ${Device.osVersion ?? ''}`.trim();
   const card = cards[cardIndex];
-  const Btn = ({ label, onPress, color }: { label: string; onPress: () => void; color: string }) => (
-    <Pressable onPress={onPress} style={{ backgroundColor: color, padding: 16, borderRadius: 14, marginVertical: 5 }}>
-      <Text style={{ color: '#130d2f', fontSize: 18, fontWeight: '800', textAlign: 'center' }}>{label}</Text>
-    </Pressable>
-  );
-  const T = ({ children, c = '#f4efff', s = 16, b = false }: { children: React.ReactNode; c?: string; s?: number; b?: boolean }) => (
-    <Text style={{ color: c, fontSize: s, fontWeight: b ? '800' : '500', marginVertical: 3 }}>{children}</Text>
-  );
+
+  const share = () => {
+    const lines = [
+      `Teste de voz · ${device}`,
+      `Motor: ${engineId}`,
+      ...rows.map((r) => `${r.label}: ${r.value}`),
+      `Palavra mágica: ${probeText(magic)}`,
+      `Resposta (${card.resposta}): ${probeText(answer)}`,
+      stats ? `Reinícios: ${stats.restarts} · vão médio ${stats.gapAvgMs ?? '—'} ms · vão máx ${stats.gapMaxMs ?? '—'} ms` : '',
+      '--- registro ---',
+      ...[...log].reverse().map((l) => `${seconds(l.t)}  ${l.text}`),
+    ];
+    void Share.share({ message: lines.filter(Boolean).join('\n') });
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#130d2f' }}>
       <ScrollView contentContainerStyle={{ padding: 20 }}>
         <Link href="/" style={{ color: '#b79cff', fontSize: 16 }}>← voltar</Link>
         <T s={26} c="#ffca4b" b>Teste de voz</T>
-        <T c="#b8abdc">Resposta da carta (diga em voz alta): {card.resposta}</T>
-        <T c="#b8abdc">Diga "Pistache" (avança), "Pistache, pausa" e depois "Pistache" (retoma).</T>
-        <Btn label={`Carta: ${card.resposta} (tocar para trocar)`} color="#372762" onPress={() => setCardIndex((cardIndex + 1) % cards.length)} />
-        {status === 'parado'
-          ? <Btn label="Começar a ouvir" color="#39e58c" onPress={start} />
-          : <Btn label="Parar" color="#ff777b" onPress={stop} />}
-        <T b c={status === 'ouvindo' ? '#39e58c' : '#b8abdc'}>Estado: {status}{paused ? ' · PAUSADO' : ''}</T>
-        <T c="#b8abdc">Taxa do microfone: {rate || '—'} Hz · captado: {captured}s · enviado: {seconds}s{captured > 0 ? ` (${Math.round((seconds / captured) * 100)}%)` : ''}</T>
-        <Btn label={useGate ? 'Filtro de silêncio: LIGADO (tocar para desligar)' : 'Filtro de silêncio: DESLIGADO (tocar para ligar)'} color="#372762" onPress={() => { gateOn.current = !useGate; setUseGate(!useGate); }} />
-        {error ? <T c="#ff777b" b>{error}</T> : null}
-        <View style={{ marginTop: 10, padding: 12, borderRadius: 12, backgroundColor: '#211747' }}>
-          <T c="#b8abdc" s={13}>OUVINDO AGORA</T>
-          <T s={20}>{interim || '…'}</T>
-        </View>
-        <T b>Frases entendidas</T>
-        {lines.map((l) => (
-          <View key={l.id} style={{ paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#493a78' }}>
-            <T>{l.text}</T>
-            {l.note ? <T c="#ffca4b" b s={14}>{l.note}</T> : null}
+        <T c="#b8abdc" s={14}>{device}</T>
+
+        <Box title="MOTOR (pare antes de trocar)">
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Btn label={engineId === 'native' ? '● Nativo' : 'Nativo'} color={engineId === 'native' ? '#b18aff' : '#372762'} dark={engineId === 'native'} onPress={() => !active && setEngineId('native')} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Btn label={engineId === 'deepgram' ? '● Deepgram' : 'Deepgram'} color={engineId === 'deepgram' ? '#b18aff' : '#372762'} dark={engineId === 'deepgram'} onPress={() => !active && setEngineId('deepgram')} />
+            </View>
           </View>
-        ))}
+          {engineId === 'native' ? (
+            <>
+              <Btn label={onDevice ? 'Reconhecer: SÓ NO APARELHO (tocar para trocar)' : 'Reconhecer: padrão do sistema (tocar para trocar)'} onPress={() => !active && setOnDevice(!onDevice)} />
+              <Btn label={hints ? 'Dicas de vocabulário: LIGADAS (tocar para trocar)' : 'Dicas de vocabulário: DESLIGADAS (tocar para trocar)'} onPress={() => !active && setHints(!hints)} />
+              {Platform.OS === 'android' ? (
+                <Btn label="Baixar modelo pt-BR (Android, para usar sem internet)" onPress={async () => addLog(await (makeEngine().downloadModel?.() ?? Promise.resolve('indisponível')), 'warn')} />
+              ) : null}
+            </>
+          ) : (
+            <Btn label={gateOn ? 'Filtro de silêncio: LIGADO (tocar para trocar)' : 'Filtro de silêncio: DESLIGADO (tocar para trocar)'} onPress={() => { const next = !gateOn; setGateOn(next); engine.current?.setSilenceFilter?.(next); }} />
+          )}
+        </Box>
+
+        {active ? <Btn label="Parar" color="#ff777b" dark onPress={stop} /> : <Btn label="Começar a ouvir" color="#39e58c" dark onPress={start} />}
+        <T b c={status === 'on' ? '#39e58c' : status === 'error' ? '#ff777b' : '#b8abdc'}>
+          Estado: {STATUS_LABEL[status]}{paused ? ' · PAUSADO' : ''} · ligado há {elapsed}
+        </T>
+        {error ? <T c="#ff777b" b>{error}</T> : null}
+
+        <Box title="TECNOLOGIA EM USO">
+          {rows.map((r) => (
+            <T key={r.label} s={14}><Text style={{ color: '#b8abdc' }}>{r.label}: </Text>{r.value}</T>
+          ))}
+          {stats ? (
+            <>
+              {engineId === 'native' ? (
+                <T s={14}><Text style={{ color: '#b8abdc' }}>Reinícios da escuta: </Text>{stats.restarts} · vão médio {stats.gapAvgMs ?? '—'} ms · vão máx {stats.gapMaxMs ?? '—'} ms</T>
+              ) : (
+                <T s={14}><Text style={{ color: '#b8abdc' }}>Áudio: </Text>captado {stats.capturedSec}s · enviado {stats.sentSec}s</T>
+              )}
+            </>
+          ) : null}
+          <T s={12} c="#b8abdc">Pausa e retoma só são avaliadas no texto final.</T>
+        </Box>
+
+        <Box title="O QUE ESTÁ SENDO ENTENDIDO AGORA">
+          <T s={20}>{interim || '…'}</T>
+        </Box>
+
+        <Box title="PLACAR DO TESTE (toque logo DEPOIS de falar)">
+          <T b s={15}>Palavra mágica: {probeText(magic)}</T>
+          <Btn label='Eu disse "PISTACHE" agora' color="#ffca4b" dark onPress={() => mark(magicAttempts, 'PISTACHE')} />
+          <T b s={15}>Resposta ({card.resposta}): {probeText(answer)}</T>
+          <Btn label={`Eu disse a RESPOSTA agora (${card.resposta})`} color="#b18aff" dark onPress={() => mark(answerAttempts, 'a resposta')} />
+          <Btn label={`Trocar carta (${card.resposta})`} onPress={() => { setCardIndex((cardIndex + 1) % cards.length); answerSeen.current = false; }} />
+          <Btn label="Zerar placar e registro" onPress={resetScore} />
+        </Box>
+
+        <Box title="REGISTRO">
+          <Btn label="Compartilhar / copiar resultado" onPress={share} />
+          {log.map((l) => (
+            <T key={l.id} s={14} c={TONE_COLOR[l.tone]}>{seconds(l.t)}  {l.text}</T>
+          ))}
+        </Box>
       </ScrollView>
     </SafeAreaView>
   );

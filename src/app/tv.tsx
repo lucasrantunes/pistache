@@ -1,9 +1,11 @@
 // Página da TV (só visualização). Abra no navegador da TV; ela mostra um código de 4 letras.
-// Quadro de 1280 x 720 do sketch "piso de pedra", escalado para a tela. Pode abrir a qualquer momento,
+// Quadro de 1280 x 720 do sketch "trilha com bonecos", escalado para a tela. Pode abrir a qualquer momento,
 // inclusive com a partida em andamento: o celular reenvia o estado quando a TV pede.
 import { createElement, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Platform, Text, View, useWindowDimensions } from 'react-native';
 
+import { CATEGORIAS } from '@/content';
+import { CatIcon } from '@/ui/lobby-parts';
 import { CLUE_MS, MAX_CLUES, SPECIAL_SQUARES, clueTimer, squareOf } from '@/game';
 import type { ClueLevel } from '@/game';
 import type { SpecialKind } from '@/game';
@@ -11,10 +13,11 @@ import { newRoomCode } from '@/realtime/code';
 import { joinRoom } from '@/realtime/room';
 import type { RoomStatus } from '@/realtime/room';
 import type { TvPlayer, TvView } from '@/realtime/view';
-import { FLOOR_TOP, TORCHES, floorStones } from '@/scene/floor';
 import { enableSound, play, soundState, subscribeSound, toggleMute } from '@/scene/sound';
-import { TV_HEIGHT, TV_WIDTH, trackCurve, trackSpots } from '@/scene/track';
+import { TRACK_CENTER_Y, TRACK_PATH, TV_HEIGHT, TV_WIDTH, tileLook, trackSpots } from '@/scene/track';
 import { WALK_STEP_MS, walkPath, walkStepMs } from '@/scene/walk';
+import { animalDe } from '@/ui/animais';
+import { BONECO_H, BONECO_PE, Boneco } from '@/ui/bonecos';
 import { Medal } from '@/ui/kit';
 import { C, F } from '@/ui/theme';
 
@@ -22,9 +25,6 @@ const CODE_KEY = 'pistache:tv-code';
 // Vídeo preto de 2 s, sem som, em repetição: faz TVs sem a função "manter tela ligada" acharem que alguém está assistindo.
 const NOSLEEP_VIDEO = 'data:video/mp4;base64,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';
 const SPOTS = trackSpots();
-const CURVE = trackCurve();
-const STONES = floorStones();
-const PATH_D = 'M' + CURVE.map((q) => `${q.x.toFixed(1)} ${q.y.toFixed(1)}`).join(' L');
 
 function loadCode(): string {
   try {
@@ -57,42 +57,40 @@ function useKeepAwake() {
 
 // Estilos só da web (a TV roda no navegador).
 const web = (o: object) => o as object;
-const bg = web({ backgroundColor: C.bg });
+// Fundo e painéis no estilo do Pitaco: noite roxa com estrelinhas e brilho no alto (o fundo vai por CSS na página); painéis de vidro com degradê.
+const bg = web({ backgroundColor: 'transparent' });
+/** Fundo da página (o Stack do app pinta tudo de roxo liso, então o fundo vai numa camada própria atrás de tudo). */
+function PageBackground() {
+  if (Platform.OS !== 'web') return null;
+  return createElement('div', {
+    'aria-hidden': true,
+    style: {
+      position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'none',
+      backgroundColor: '#130d2f',
+      backgroundImage: 'radial-gradient(circle at 13% 11%, rgba(209,183,255,0.55) 0 1.4px, transparent 2.4px), radial-gradient(circle at 76% 38%, rgba(209,183,255,0.4) 0 1.4px, transparent 2.4px), radial-gradient(circle at 42% 73%, rgba(209,183,255,0.35) 0 1.2px, transparent 2.2px), radial-gradient(ellipse at 50% 0, #24175b, transparent 67%)',
+      backgroundSize: '277px 251px, 331px 289px, 367px 313px, 100% 100%',
+      backgroundPosition: '0 0, 31px 17px, 83px 41px, 0 0',
+      backgroundRepeat: 'repeat, repeat, repeat, no-repeat',
+    },
+  });
+}
+const GLASS = 'linear-gradient(145deg, rgba(54,39,101,0.92), rgba(28,19,66,0.95))';
+const GLASS_GREEN = 'linear-gradient(110deg, #173e3d, #211747)';
 const abs = { position: 'absolute' } as const;
 
 const brand = (size: number, color: string = C.ink) => ({ fontFamily: F.brand, fontSize: size, color }) as const;
 
 // ---------- Cena do jogo ----------
 
-function Floor() {
-  return (
-    <>
-      {STONES.map((s, i) => (
-        <View key={i} style={[abs, web({ left: s.left, top: s.top, width: s.w, height: s.h, backgroundColor: s.fill, clipPath: s.clip })]} />
-      ))}
-      {Platform.OS === 'web'
-        ? createElement(
-            'svg',
-            { width: TV_WIDTH, height: TV_HEIGHT, viewBox: `0 0 ${TV_WIDTH} ${TV_HEIGHT}`, style: { position: 'absolute', left: 0, top: 0 }, 'aria-hidden': true },
-            createElement('path', { d: PATH_D, fill: 'none', stroke: '#0b0720', strokeOpacity: 0.55, strokeWidth: 104, strokeLinecap: 'round', strokeLinejoin: 'round' }),
-            createElement('path', { d: PATH_D, fill: 'none', stroke: '#2b1f5c', strokeWidth: 90, strokeLinecap: 'round', strokeLinejoin: 'round' }),
-            createElement('path', { d: PATH_D, fill: 'none', stroke: '#4d3d90', strokeWidth: 80, strokeDasharray: '54 5', strokeLinejoin: 'round' }),
-            createElement('path', { d: PATH_D, fill: 'none', stroke: '#5a49a6', strokeWidth: 42, strokeDasharray: '36 6', strokeDashoffset: 27, strokeLinejoin: 'round' }),
-          )
-        : null}
-      {TORCHES.map((t, i) => (
-        <View key={i}>
-          <View style={[abs, web({ left: t.x - 150, top: t.y - 150, width: 300, height: 300, borderRadius: 150, backgroundImage: 'radial-gradient(circle, rgba(255,143,61,0.38) 0%, rgba(255,143,61,0.12) 40%, rgba(255,143,61,0) 70%)' })]} />
-          <View style={[abs, { left: t.x - 15, top: t.y - 60, width: 30, height: 70 }]}>
-            <View style={[abs, { left: 3, bottom: 0, width: 24, height: 30, borderRadius: 6, backgroundColor: '#3a2f66', borderBottomWidth: 5, borderBottomColor: '#271e4d' }]} />
-            <View style={[abs, web({ left: 2, bottom: 26, width: 26, height: 40, borderRadius: '50% 50% 50% 50% / 62% 62% 38% 38%', backgroundImage: 'linear-gradient(180deg,#ffca4b 0%,#ff8f3d 60%,#ff5a3d 100%)' })]} />
-            <View style={[abs, web({ left: 9, bottom: 28, width: 12, height: 22, borderRadius: '50% 50% 50% 50% / 62% 62% 38% 38%', backgroundColor: '#fff3b8' })]} />
-          </View>
-        </View>
-      ))}
-      <View style={[abs, web({ left: 0, top: FLOOR_TOP, width: TV_WIDTH, height: TV_HEIGHT - FLOOR_TOP, backgroundImage: 'radial-gradient(ellipse at 50% 55%, rgba(19,13,47,0) 45%, rgba(19,13,47,0.72) 100%)', pointerEvents: 'none' })]} />
-      <View style={[abs, web({ left: 0, top: FLOOR_TOP, width: TV_WIDTH, height: 60, backgroundImage: 'linear-gradient(180deg, rgba(19,13,47,0.85), rgba(19,13,47,0))' })]} />
-    </>
+/** Fundo liso (sem piso de pedra) e a trilha em S desenhada em SVG, atrás das casas. */
+function TrailBase() {
+  if (Platform.OS !== 'web') return null;
+  return createElement(
+    'svg',
+    { width: TV_WIDTH, height: TV_HEIGHT, viewBox: `0 0 ${TV_WIDTH} ${TV_HEIGHT}`, style: { position: 'absolute', left: 0, top: 0 }, 'aria-hidden': true },
+    createElement('path', { d: TRACK_PATH, fill: 'none', stroke: '#0b0720', strokeWidth: 98, strokeLinecap: 'round' }),
+    createElement('path', { d: TRACK_PATH, fill: 'none', stroke: '#2b1f5c', strokeWidth: 86, strokeLinecap: 'round' }),
+    createElement('path', { d: TRACK_PATH, fill: 'none', stroke: '#4d3d90', strokeWidth: 74, strokeDasharray: '54 5' }),
   );
 }
 
@@ -168,75 +166,52 @@ function Track({ view }: { view: TvView }) {
       {SPOTS.slice(1).map((s, idx) => {
         const sq = idx + 1;
         const special = SPECIAL_SQUARES[sq];
+        const look = tileLook(sq);
         const goal = sq === 25;
         const t = special ? TILE[special] : goal ? { bg: '#ffca4b', edge: '#c79a22', text: '⚑' } : { bg: '#8470d6', edge: '#5646a6', text: '' };
         return (
-          <View key={sq} style={[abs, web({ left: s.x - 33, top: s.y - 25, width: 66, height: 50, borderRadius: 13, backgroundColor: t.bg, borderBottomWidth: 6, borderBottomColor: t.edge, alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.35)' })]}>
+          <View key={sq} style={[abs, web({ left: s.x - (74 + look.dw) / 2, top: s.y - 26, width: 74 + look.dw, height: 52, transform: `rotate(${look.rot}deg)`, borderRadius: 13, backgroundColor: t.bg, borderBottomWidth: 6, borderBottomColor: t.edge, alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.35)' })]}>
             {t.text ? <Text style={brand(special === 'dobro' ? 28 : 30, C.dark)}>{t.text}</Text> : null}
           </View>
         );
       })}
-      <Text style={[abs, { left: SPOTS[0].x - 22, top: SPOTS[0].y + 30, fontFamily: F.heavy, fontSize: 14, color: C.muted }]}>SAÍDA</Text>
-      <Text style={[abs, brand(20, C.yellow), { left: SPOTS[25].x - 70, top: SPOTS[25].y + 30, width: 140, textAlign: 'center' }]}>META: {view.goal}</Text>
-      {view.players.map((p) => {
+      <View style={[abs, web({ left: SPOTS[0].x - 36, top: SPOTS[0].y - 24, width: 72, height: 48, borderRadius: 12, borderWidth: 3, borderStyle: 'dashed', borderColor: C.muted })]} />
+      <Text style={[abs, brand(22, C.lavender), { left: SPOTS[0].x - 60, top: SPOTS[0].y - 112, width: 120, textAlign: 'center', letterSpacing: 1 }]}>SAÍDA ▾</Text>
+      <Text style={[abs, brand(22, C.yellow), { left: SPOTS[25].x - 70, top: SPOTS[25].y - 63, width: 140, textAlign: 'center' }]}>META {view.goal}</Text>
+      {view.players.map((p, idx) => {
         const w = walk[p.id] ?? { square: p.square, walking: false, stepMs: WALK_STEP_MS };
         const s = SPOTS[w.square];
         const mates = bySquare.get(w.square) ?? [p];
-        const shift = (mates.indexOf(p) - (mates.length - 1) / 2) * 46;
+        const slot = mates.indexOf(p);
+        const shift = (slot - (mates.length - 1) / 2) * Math.min(70, 220 / Math.max(1, mates.length - 1));
+        const leader = p.id === view.leaderId;
+        const esc = leader ? 1.2 : 1.05;
+        // Os pés ficam um pouco abaixo do centro da casa; a faixa com nome e pontos fica logo abaixo dos pés.
+        const top = s.y + 14 - BONECO_PE * esc;
         return (
           <View
             key={p.id}
             style={[abs, web({
-              left: s.x - 50 + shift, top: s.y - 88, width: 100, alignItems: 'center', gap: 2, zIndex: w.walking ? 5 : 1,
+              left: s.x - 60 + shift, top, width: 120, alignItems: 'center', zIndex: w.walking ? 5 : 1,
               transitionProperty: 'left, top', transitionDuration: `${w.stepMs}ms`, transitionTimingFunction: 'linear',
               ...(w.walking ? { animationName: 'pistache-hop', animationDuration: `${w.stepMs}ms`, animationIterationCount: 'infinite', animationTimingFunction: 'ease-in-out' }
                 : reaction && p.id === view.result?.winnerId ? { animationName: reaction === 'bad' ? 'pistache-shake' : 'pistache-hop', animationDuration: reaction === 'bad' ? '500ms' : '420ms', animationIterationCount: reaction === 'bad' ? 4 : 5 } : {}),
             })]}>
-            <Medal name={p.name} color={p.color} size={51} leader={p.id === view.leaderId} sad={p.muted} />
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, paddingHorizontal: 12, paddingVertical: 2, borderRadius: 999, backgroundColor: C.bg, borderWidth: 2, borderColor: p.color }}>
-              <Text numberOfLines={1} style={brand(20)}>{p.name}</Text>
-              <Text style={brand(20, C.yellow)}>{p.points}</Text>
+            <Boneco animal={animalDe(idx, p.name)} cor={p.color} escala={esc} lider={leader} triste={p.muted || (reaction === 'bad' && p.id === view.result?.winnerId)} />
+            <View style={{ marginTop: -((BONECO_H - BONECO_PE) * esc) + 4 + (slot % 2) * 26, flexDirection: 'row', alignItems: 'baseline', gap: 6, paddingHorizontal: 12, paddingVertical: 1, borderRadius: 999, backgroundColor: C.bg, borderWidth: 2, borderColor: p.color }}>
+              <Text numberOfLines={1} style={brand(18)}>{p.name}</Text>
+              <Text style={brand(18, C.yellow)}>{p.points}</Text>
             </View>
           </View>
         );
       })}
-    </>
-  );
-}
-
-/** Orbe dos pontos em jogo: o anel dourado encolhe a cada dica; na revelação mostra a resposta (decisão 45). */
-function Orb({ view }: { view: TvView }) {
-  const revealed = view.answer !== null;
-  const ring = 70 + 136 * (view.points / MAX_CLUES);
-  return (
-    <>
-      <View style={[abs, web({ left: 25, top: 360, width: 280, height: 280, borderRadius: 140, borderWidth: 10, borderColor: '#4d3d90', backgroundImage: 'radial-gradient(circle, #2f2558 0%, #1f1745 75%)', boxShadow: '0 0 0 5px #2b1f5c, 0 0 40px rgba(255,143,61,0.25)' })]} />
-      <View style={[abs, { left: 80, top: 415, width: 170, height: 170, borderRadius: 85, borderWidth: 3, borderColor: 'rgba(177,138,255,0.22)' }]} />
-      <View style={[abs, { left: 110, top: 445, width: 110, height: 110, borderRadius: 55, borderWidth: 3, borderColor: 'rgba(177,138,255,0.22)' }]} />
-      {revealed ? (
-        <View style={[abs, web({ left: 165 - 103, top: 500 - 103, width: 206, height: 206, borderRadius: 103, borderWidth: 6, borderColor: C.green, backgroundColor: 'rgba(50,227,151,0.14)', alignItems: 'center', justifyContent: 'center', padding: 14, boxShadow: '0 0 24px rgba(50,227,151,0.5)' })]}>
-          <Text style={brand(34, C.green)}>✓</Text>
-          <Text style={[brand(60, C.yellow), { lineHeight: 64 }]}>{(view.result?.gained ?? 0) > 0 ? `+${view.result?.gained}` : '—'}</Text>
-          <Text style={{ fontFamily: F.heavy, fontSize: 18, color: C.muted }}>pontos</Text>
-        </View>
-      ) : (
-        <>
-          <View style={[abs, web({ left: 165 - ring / 2, top: 500 - ring / 2, width: ring, height: ring, borderRadius: ring / 2, borderWidth: 9, borderColor: C.yellow, boxShadow: '0 0 24px rgba(255,202,75,0.55), inset 0 0 18px rgba(255,202,75,0.25)' })]} />
-          <View style={[abs, { left: 40, top: 450, width: 250, alignItems: 'center' }]}>
-            <View key={`pts-${view.cardIndex}-${view.points}`} style={web({ animationName: 'pistache-drop', animationDuration: '420ms', animationFillMode: 'both' })}>
-              <Text style={[brand(84, C.yellow), { lineHeight: 84 }]}>{view.points}</Text>
-            </View>
-            <Text style={{ fontFamily: F.heavy, fontSize: 18, color: C.muted }}>pontos em jogo</Text>
-          </View>
-        </>
-      )}
     </>
   );
 }
 
 function RoomBadge({ code }: { code: string }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingHorizontal: 16, paddingVertical: 4, borderRadius: 14, backgroundColor: C.panel, borderWidth: 2, borderColor: 'rgba(255,202,75,0.6)' }}>
+    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingHorizontal: 16, paddingVertical: 4, borderRadius: 14, backgroundColor: '#2a2056', borderWidth: 2, borderColor: 'rgba(255,202,75,0.6)' }}>
       <Text style={{ fontFamily: F.heavy, fontSize: 18, color: C.muted }}>Sala</Text>
       <Text style={[brand(32, C.yellow), { letterSpacing: 3 }]}>{code}</Text>
     </View>
@@ -245,7 +220,7 @@ function RoomBadge({ code }: { code: string }) {
 
 const TIMER_COLOR: Record<ClueLevel, string> = { ok: C.green, warn: C.orange, danger: C.red };
 
-/** O tempo da dica na TV: conta sozinho a partir do valor que o celular mandou (sem mensagem a cada segundo). */
+/** O tempo da pista na TV: conta sozinho a partir do valor que o celular mandou (sem mensagem a cada segundo). */
 function useClueClock(view: TvView, receivedAt: number) {
   const [, tick] = useState(0);
   useEffect(() => {
@@ -271,12 +246,43 @@ function MicBanner() {
   );
 }
 
-/** O que o jogo está entendendo da fala: as 2 últimas palavras, num quadro fixo (só troca o texto, sem animação). */
-function Words({ text }: { text: string }) {
+/** Coluna da esquerda, centrada na vertical com a trilha: o que o microfone ouve agora e os últimos palpites errados. */
+function SidePanel({ text, guesses }: { text: string; guesses: string[] }) {
+  const wrong = guesses.slice(-3).reverse();
+  const eq = (dur: string, delay: string, key: number) => (
+    <View key={key} style={web({ width: 4, height: 20, borderRadius: 2, backgroundColor: C.green, animationName: 'pistache-eq', animationDuration: dur, animationDelay: delay, animationIterationCount: 'infinite' })} />
+  );
   return (
-    <View style={[abs, web({ left: 25, top: 652, width: 280, height: 58, borderRadius: 16, backgroundColor: C.panel, borderWidth: 2, borderColor: 'rgba(177,138,255,0.4)', justifyContent: 'center', paddingHorizontal: 14 })]}>
-      <Text style={{ fontFamily: F.heavy, fontSize: 12, letterSpacing: 2, color: C.muted }}>🎤 OUVINDO</Text>
-      <Text numberOfLines={1} style={brand(26)}>{text || '…'}</Text>
+    <View style={[abs, web({ left: 40, top: TRACK_CENTER_Y - 195, width: 214, height: 390, justifyContent: 'center', gap: 18 })]}>
+      <View style={web({ borderRadius: 22, backgroundImage: GLASS_GREEN, borderWidth: 2, borderColor: 'rgba(50,227,151,0.6)', paddingHorizontal: 16, paddingVertical: 16, gap: 12 })}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={web({ width: 28, height: 28, borderRadius: 14, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center', animationName: 'pistache-ping', animationDuration: '1.4s', animationIterationCount: 'infinite' })}>
+            <Text style={{ fontSize: 15 }}>🎤</Text>
+          </View>
+          <Text style={{ fontFamily: F.heavy, fontSize: 13, letterSpacing: 1.5, color: C.green }}>OUVINDO AGORA</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 'auto' }}>
+            {[['.7s', '0s'], ['.5s', '.1s'], ['.9s', '.2s'], ['.6s', '.05s']].map(([d, dl], i) => eq(d, dl, i))}
+          </View>
+        </View>
+        <Text numberOfLines={2} style={[brand(26), { lineHeight: 30 }]}>{text ? `“${text}”` : '…'}</Text>
+        <Text numberOfLines={1} style={{ fontFamily: F.heavy, fontSize: 13, color: C.muted }}>Diga <Text style={[brand(16, C.yellow), { letterSpacing: 1 }]}>PISTA</Text> para a próxima</Text>
+      </View>
+      <View style={web({ borderRadius: 22, backgroundImage: GLASS, borderWidth: 2, borderColor: 'rgba(255,119,123,0.5)', paddingHorizontal: 16, paddingVertical: 16, gap: 12 })}>
+        <Text style={{ fontFamily: F.heavy, fontSize: 13, letterSpacing: 1.5, color: C.red }}>NÃO É…</Text>
+        {wrong.length === 0
+          ? <Text style={{ fontFamily: F.heavy, fontSize: 18, color: C.muted }}>Nenhum palpite errado ainda</Text>
+          : wrong.map((g, i) => {
+            const size = [24, 20, 18][i];
+            return (
+              <View key={`${g}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3, paddingLeft: 6, paddingRight: 12, borderRadius: 999, backgroundColor: 'rgba(255,119,123,0.10)', borderWidth: 1.5, borderColor: 'rgba(255,119,123,0.5)', opacity: [1, 0.85, 0.7][i] }}>
+                <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: C.red, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontFamily: F.brand, fontSize: size * 0.62, lineHeight: size * 0.8, color: C.dark }}>✕</Text>
+                </View>
+                <Text numberOfLines={1} style={{ flex: 1, fontFamily: F.heavy, fontSize: size, lineHeight: size + 6, color: C.ink, textDecorationLine: 'line-through', textDecorationColor: C.red }}>{g}</Text>
+              </View>
+            );
+          })}
+      </View>
     </View>
   );
 }
@@ -290,6 +296,9 @@ function Header({ view, code, receivedAt }: { view: TvView; code: string; receiv
   const fx = view.result?.effectCard ?? null;
   const effect = revealed ? (view.result?.effectText ?? '') : '';
   const bad = fx?.tone === 'bad';
+  const catInfo = CATEGORIAS.find((c) => c.rotulo === view.category);
+  const catColor = catInfo?.cor ?? C.lavender;
+  const catId = catInfo?.id ?? '';
 
   // Tique-taque bem baixinho nos últimos 5 segundos.
   const danger = inClue && view.timerRunning && timer.level === 'danger';
@@ -299,68 +308,76 @@ function Header({ view, code, receivedAt }: { view: TvView; code: string; receiv
   if (view.screen === 'effect' && revealed) {
     body = (
       <>
-        <BigWord word={view.answer!} color={C.green} max={56} />
-        <Text numberOfLines={1} style={{ fontFamily: F.heavy, fontSize: 40, lineHeight: 46, color: bad ? C.red : C.yellow }}>{effect}</Text>
+        <BigWord word={view.answer!} color={C.green} max={52} />
+        <Text numberOfLines={1} style={{ fontFamily: F.heavy, fontSize: 34, lineHeight: 40, color: bad ? C.red : C.yellow }}>{effect}</Text>
       </>
     );
   } else if (view.screen === 'answer' && revealed) {
     body = (
       <>
         <View key={`ans-${view.cardIndex}-${winner}`} style={web({ alignItems: 'center', animationName: 'pistache-pop', animationDuration: '450ms', animationFillMode: 'both' })}>
-          <BigWord word={view.answer!} color={C.green} />
+          <BigWord word={view.answer!} color={C.green} max={64} />
         </View>
-        <Text numberOfLines={1} style={{ fontFamily: F.heavy, fontSize: 32, lineHeight: 38, color: C.ink }}>{view.corrected ? <Text style={{ color: C.orange }}>Corrigido: </Text> : null}{winner} acertou na dica {view.clue}!  <Text style={{ color: C.yellow }}>+{view.result?.gained ?? 0}</Text></Text>
+        <Text numberOfLines={1} style={{ fontFamily: F.heavy, fontSize: 28, lineHeight: 34, color: C.ink }}>{view.corrected ? <Text style={{ color: C.orange }}>Corrigido: </Text> : null}{winner} acertou na pista {view.clue}!  <Text style={{ color: C.yellow }}>+{view.result?.gained ?? 0}</Text></Text>
       </>
     );
   } else if (view.phase === 'noWinner' && revealed) {
     body = (
       <>
-        <BigWord word={view.answer!} color={C.green} />
-        <Text numberOfLines={1} style={{ fontFamily: F.heavy, fontSize: 30, lineHeight: 36, color: C.ink }}>Ninguém acertou. Quem chegou mais perto? <Text style={{ color: C.yellow }}>Diga o nome (+5)</Text></Text>
+        <BigWord word={view.answer!} color={C.green} max={64} />
+        <Text numberOfLines={1} style={{ fontFamily: F.heavy, fontSize: 26, lineHeight: 32, color: C.ink }}>Ninguém acertou. Quem chegou mais perto? <Text style={{ color: C.yellow }}>Diga o nome (+5)</Text></Text>
       </>
     );
   } else if (heard) {
     body = (
       <>
-        <BigWord word={heard} color={C.green} />
-        <Text numberOfLines={1} style={{ fontFamily: F.heavy, fontSize: 32, lineHeight: 38, color: C.yellow }}>Quem acertou? Diga seu nome</Text>
+        <BigWord word={heard} color={C.green} max={64} />
+        <Text numberOfLines={1} style={{ fontFamily: F.heavy, fontSize: 28, lineHeight: 34, color: C.yellow }}>Quem acertou? Diga seu nome</Text>
       </>
     );
   } else {
     body = (
       <View key={`clue-${view.cardIndex}-${view.clue}`} style={web({ animationName: 'pistache-in', animationDuration: '380ms', animationFillMode: 'both' })}>
-        <Text numberOfLines={2} style={{ fontFamily: F.heavy, fontSize: 44, lineHeight: 52, textAlign: 'center', color: C.ink }}>{view.clueText ?? ''}</Text>
+        <Text numberOfLines={2} style={{ fontFamily: F.heavy, fontSize: 36, lineHeight: 44, textAlign: 'center', color: C.ink }}>{view.clueText ?? ''}</Text>
       </View>
     );
   }
 
   return (
-    <View style={[abs, web({ left: 0, top: 0, width: TV_WIDTH, height: FLOOR_TOP, paddingHorizontal: 32, paddingVertical: 20, gap: 12, backgroundImage: `linear-gradient(180deg, ${C.bg} 0%, ${C.bgTop} 100%)` })]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-          <Text style={brand(40)}>{revealed ? `Carta ${view.cardIndex + 1}` : `Dica ${view.clue}`}<Text style={brand(28, C.muted)}>{revealed ? '' : ` / ${MAX_CLUES}`}</Text></Text>
-          <View style={{ paddingHorizontal: 18, paddingVertical: 6, borderRadius: 999, borderWidth: 3, borderColor: C.lavender }}>
-            <Text style={{ fontFamily: F.heavy, fontSize: 20, color: C.lavender }}>{view.category}</Text>
+    <View style={[abs, web({ left: 0, top: 0, width: TV_WIDTH, height: 214, paddingHorizontal: 40, paddingTop: 28, gap: 14 })]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 54 }}>
+        <View style={web({ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' })}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, height: 52, paddingLeft: 10, paddingRight: 26, borderRadius: 999, borderWidth: 4, borderColor: catColor, backgroundColor: catColor + '33' }}>
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: catColor, alignItems: 'center', justifyContent: 'center' }}><CatIcon id={catId} size={24} /></View>
+            <Text style={{ fontFamily: F.heavy, fontSize: 28, color: C.ink }}>{view.category}</Text>
           </View>
-          {view.paused && !heard ? <Text style={{ fontFamily: F.heavy, fontSize: 20, letterSpacing: 3, color: C.orange }}>PAUSADO</Text> : null}
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+          <Text style={brand(40)}>{revealed ? `Carta ${view.cardIndex + 1}` : `Pista ${view.clue}`}<Text style={brand(28, C.muted)}>{revealed ? '' : ` / ${MAX_CLUES}`}</Text></Text>
+          {view.paused && !heard ? <Text style={{ fontFamily: F.heavy, fontSize: 20, letterSpacing: 3, color: C.orange }}>PAUSADO</Text> : null}
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20 }}>
+          {Platform.OS === 'web' ? <SoundIcon /> : null}
           {inClue ? (
             <View style={web({ minWidth: 92, height: 52, paddingHorizontal: 14, borderRadius: 999, borderWidth: 4, borderColor: TIMER_COLOR[timer.level], alignItems: 'center', justifyContent: 'center', ...(danger ? { animationName: 'pistache-pulse', animationDuration: '1s', animationIterationCount: 'infinite' } : {}) })}>
               <Text style={brand(34, TIMER_COLOR[timer.level])}>{timer.secondsLeft}s</Text>
             </View>
           ) : null}
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingHorizontal: 22, paddingVertical: 6, borderRadius: 999, backgroundColor: revealed ? C.green : C.yellow }}>
-            <Text style={brand(40, C.dark)}>{revealed ? `+${view.result?.gained ?? 0}` : view.points}</Text>
-            <Text style={{ fontFamily: F.heavy, fontSize: 20, color: C.dark }}>{revealed ? 'pontos' : heard ? 'acertou?' : 'pontos em jogo'}</Text>
-          </View>
           <RoomBadge code={code} />
         </View>
       </View>
-      <View style={{ flex: 1, minHeight: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, borderRadius: 28, backgroundColor: C.panel, borderWidth: 3, borderColor: 'rgba(177,138,255,0.4)', overflow: 'hidden' }}>
-        {body}
+      <View style={web({ flex: 1, minHeight: 0, flexDirection: 'row', borderRadius: 26, backgroundImage: GLASS, borderWidth: 2, borderColor: 'rgba(177,138,255,0.5)', overflow: 'hidden' })}>
+        <View style={{ width: 150, backgroundColor: C.yellow, alignItems: 'center', justifyContent: 'center' }}>
+          <View key={`pts-${view.cardIndex}-${revealed ? 'r' : view.points}`} style={web({ animationName: 'pistache-drop', animationDuration: '420ms', animationFillMode: 'both' })}>
+            <Text style={[brand(65, C.dark), { lineHeight: 62, textAlign: 'center' }]}>{revealed ? ((view.result?.gained ?? 0) > 0 ? `+${view.result?.gained}` : '—') : view.points}</Text>
+          </View>
+          <Text style={{ fontFamily: F.heavy, fontSize: 14, color: C.dark }}>{revealed ? 'pontos' : 'pontos em jogo'}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+          {body}
+        </View>
         {inClue ? (
-          <View style={{ position: 'absolute', left: 0, bottom: 0, width: `${timer.fraction * 100}%`, height: 10, backgroundColor: TIMER_COLOR[timer.level] }} />
+          <View style={{ position: 'absolute', left: 0, bottom: 0, width: `${timer.fraction * 100}%`, height: 8, backgroundColor: TIMER_COLOR[timer.level] }} />
         ) : null}
       </View>
     </View>
@@ -405,28 +422,42 @@ function Confetti({ count, loop = false }: { count: number; loop?: boolean }) {
 
 // ---------- Botão de som ----------
 
+function SoundIcon() {
+  const st = useSyncExternalStore(subscribeSound, soundState, soundState);
+  const off = st !== 'on';
+  const stroke = off ? '#8f82bd' : '#cdbdf7';
+  return (
+    <View
+      accessibilityRole="button"
+      accessibilityLabel={st === 'muted' ? 'Som desligado' : 'Som ligado'}
+      onPointerDown={() => { if (st === 'off') void enableSound(); else toggleMute(); }}
+      style={web({ width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(177,138,255,0.16)', cursor: 'pointer' })}>
+      {createElement(
+        'svg',
+        { width: 28, height: 28, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true },
+        createElement('path', { d: 'M3.5 9.5H7L11.5 5.5v13L7 14.5H3.5z', stroke, strokeWidth: 1.8, strokeLinejoin: 'round' }),
+        ...(off
+          ? [createElement('path', { key: 'x', d: 'M15.5 9.5l5 5M20.5 9.5l-5 5', stroke: '#ff777b', strokeWidth: 2, strokeLinecap: 'round' })]
+          : [
+            createElement('path', { key: 'a', d: 'M15.2 9.2a4.2 4.2 0 0 1 0 5.6', stroke, strokeWidth: 1.8, strokeLinecap: 'round' }),
+            createElement('path', { key: 'b', d: 'M17.8 6.6a8 8 0 0 1 0 10.8', stroke, strokeWidth: 1.8, strokeLinecap: 'round' }),
+          ]),
+      )}
+    </View>
+  );
+}
+
+/** Faixa amarela só enquanto o navegador ainda não liberou o som. */
 function SoundPill() {
   const st = useSyncExternalStore(subscribeSound, soundState, soundState);
-  if (st === 'off') {
-    return (
-      <Text
-        onPress={() => void enableSound()}
-        accessibilityRole="button"
-        style={[abs, web({ left: 0, right: 0, bottom: 0, zIndex: 60, paddingVertical: 14, textAlign: 'center', backgroundColor: C.yellow, color: C.dark, fontFamily: F.brand, fontSize: 30, cursor: 'pointer' })]}
-      >
-        🔈 Clique na tela (ou aperte OK no controle) para ativar o som
-      </Text>
-    );
-  }
-  const label = st === 'muted' ? '🔇 Som desligado' : '🔊 Som ligado';
-  const onPress = () => toggleMute();
+  if (st !== 'off') return null;
   return (
     <Text
-      onPress={onPress}
+      onPress={() => void enableSound()}
       accessibilityRole="button"
-      style={[abs, web({ right: 18, bottom: 14, zIndex: 60, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(33,23,71,0.85)', color: C.muted, fontFamily: F.heavy, fontSize: 18, cursor: 'pointer', opacity: st === 'on' ? 0.55 : 1 })]}
+      style={[abs, web({ left: 0, right: 0, bottom: 0, zIndex: 60, paddingVertical: 14, textAlign: 'center', backgroundColor: C.yellow, color: C.dark, fontFamily: F.brand, fontSize: 30, cursor: 'pointer' })]}
     >
-      {label}
+      🔈 Clique na tela (ou aperte OK no controle) para ativar o som
     </Text>
   );
 }
@@ -434,10 +465,9 @@ function SoundPill() {
 function PlayScene({ view, code, receivedAt, words }: { view: TvView; code: string; receivedAt: number; words: string }) {
   return (
     <>
-      <Floor />
-      <Orb view={view} />
+      <TrailBase />
       <Track view={view} />
-      <Words text={words} />
+      <SidePanel text={words} guesses={view.guesses} />
       <Header view={view} code={code} receivedAt={receivedAt} />
       {view.screen === 'effect' && view.result?.effectCard ? <FxPopup key={`fx-${view.cardIndex}`} fx={view.result.effectCard} name={view.result.winnerName} /> : null}
       {view.screen === 'answer' ? <Confetti key={`cf-${view.cardIndex}`} count={36} /> : null}
@@ -476,6 +506,17 @@ function FinalScene({ view, code }: { view: TvView; code: string }) {
 }
 
 // ---------- Sala de espera ----------
+
+function Ended({ code }: { code: string }) {
+  return (
+    <View style={[abs, { left: 0, top: 0, width: TV_WIDTH, height: TV_HEIGHT, alignItems: 'center', justifyContent: 'center', gap: 20 }]}>
+      <Text style={brand(96, C.yellow)}>Pistache</Text>
+      <Text style={{ fontFamily: F.heavy, fontSize: 44, color: C.ink }}>Partida encerrada pelo host</Text>
+      <Text style={{ fontFamily: F.heavy, fontSize: 26, color: C.muted, textAlign: 'center', maxWidth: 760, lineHeight: 36 }}>Obrigado por jogar! Para uma nova partida, o host abre o Pistache e digita o código desta sala.</Text>
+      <View style={{ marginTop: 10 }}><RoomBadge code={code} /></View>
+    </View>
+  );
+}
 
 function Waiting({ code, status }: { code: string; status: RoomStatus }) {
   const steps = ['Abra o Pistache', 'Toque em “Conectar TV”', 'Digite o código ao lado'];
@@ -522,12 +563,14 @@ export default function Tv() {
   const [view, setView] = useState<TvView | null>(null);
   const [receivedAt, setReceivedAt] = useState(0);
   const [words, setWords] = useState('');
+  const [ended, setEnded] = useState(false);
   const [status, setStatus] = useState<RoomStatus>('connecting');
   useKeepAwake();
 
   useEffect(() => {
     const room = joinRoom(code, {
-      onState: (v) => { setView(v); setReceivedAt(Date.now()); },
+      onState: (v) => { setEnded(false); setView(v); setReceivedAt(Date.now()); },
+      onEnd: () => { setEnded(true); setView(null); setWords(''); },
       onWords: setWords,
       onStatus: (s) => {
         setStatus(s);
@@ -568,12 +611,11 @@ export default function Tv() {
   const screen = view?.screen ?? 'round';
   return (
     <View style={[{ flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, bg]}>
+      <PageBackground />
       <View style={web({ width: TV_WIDTH, height: TV_HEIGHT, transform: [{ scale }], overflow: 'hidden' })}>
-        {!view ? <Waiting code={code} status={status} />
+        {!view ? (ended ? <Ended code={code} /> : <Waiting code={code} status={status} />)
           : screen === 'final' ? <FinalScene view={view} code={code} />
           : <PlayScene view={view} code={code} receivedAt={receivedAt} words={words} />}
-        {/* Bordas que se desfazem no fundo: em telas de outra proporção o quadro não termina em corte seco. */}
-        <View style={[abs, web({ left: 0, top: 0, width: TV_WIDTH, height: TV_HEIGHT, pointerEvents: 'none', boxShadow: `inset 0 0 70px 28px ${C.bg}` })]} />
       </View>
       {Platform.OS === 'web' ? <SoundPill /> : null}
       {Platform.OS === 'web'
@@ -582,8 +624,11 @@ export default function Tv() {
           + '@keyframes pistache-pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08);opacity:1}100%{transform:scale(1);opacity:1}}'
           + '@keyframes pistache-pop-shake{0%{transform:scale(.6) rotate(0);opacity:0}40%{transform:scale(1.1) rotate(-3deg);opacity:1}55%{transform:scale(1) rotate(3deg)}70%{transform:rotate(-2deg)}85%{transform:rotate(2deg)}100%{transform:scale(1) rotate(0)}}'
           + '@keyframes pistache-fade{from{opacity:0}to{opacity:1}}'
+          + '@keyframes pistache-glow{0%,100%{border-color:rgba(177,138,255,.35);box-shadow:0 0 0 0 rgba(177,138,255,0)}50%{border-color:#d9ccff;box-shadow:0 0 18px 2px rgba(177,138,255,.55)}}'
           + '@keyframes pistache-in{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}'
           + '@keyframes pistache-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.14)}}'
+          + '@keyframes pistache-eq{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}'
+          + '@keyframes pistache-ping{0%{box-shadow:0 0 0 0 rgba(50,227,151,.6)}100%{box-shadow:0 0 0 14px rgba(50,227,151,0)}}'
           + '@keyframes pistache-drop{0%{transform:scale(1.35)}100%{transform:scale(1)}}'
           + '@keyframes pistache-confetti{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(780px) rotate(540deg);opacity:.9}}')
         : null}

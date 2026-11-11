@@ -28,6 +28,8 @@ export type RoomHandlers = {
   onWords?: (text: string) => void;
   /** A TV entrou (ou recarregou) e quer o estado atual. */
   onHello?: () => void;
+  /** O host encerrou a partida: a TV sai do jogo. */
+  onEnd?: () => void;
   onStatus?: (status: RoomStatus) => void;
 };
 
@@ -35,6 +37,7 @@ export type Room = {
   sendState: (view: TvView) => void;
   sendWords: (text: string) => void;
   sendHello: () => void;
+  sendEnd: () => void;
   leave: () => void;
 };
 
@@ -45,6 +48,7 @@ export function joinRoom(code: string, handlers: RoomHandlers): Room {
   channel.on('broadcast', { event: 'state' }, ({ payload }) => handlers.onState?.(payload as TvView));
   channel.on('broadcast', { event: 'words' }, ({ payload }) => handlers.onWords?.(String((payload as { text?: unknown })?.text ?? '')));
   channel.on('broadcast', { event: 'hello' }, () => handlers.onHello?.());
+  channel.on('broadcast', { event: 'end' }, () => handlers.onEnd?.());
   handlers.onStatus?.('connecting');
   channel.subscribe((status, err) => {
     if (status !== 'SUBSCRIBED') console.warn('[sala]', status, err?.message ?? '');
@@ -65,6 +69,9 @@ export function joinRoom(code: string, handlers: RoomHandlers): Room {
     },
     sendHello: () => {
       if (ready) void channel.send({ type: 'broadcast', event: 'hello', payload: {} });
+    },
+    sendEnd: () => {
+      if (ready) void channel.send({ type: 'broadcast', event: 'end', payload: {} });
     },
     leave: () => {
       void supabase.removeChannel(channel);

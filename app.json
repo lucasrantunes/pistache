@@ -43,6 +43,16 @@
             "android.permission.RECORD_AUDIO"
           ]
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "O Pistache usa o microfone para ouvir as respostas e a palavra Pistache durante a rodada.",
+          "speechRecognitionPermission": "O Pistache usa o reconhecimento de fala do aparelho para entender as respostas.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
       ]
     ],
     "experiments": {

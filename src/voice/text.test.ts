@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { containsPhrase, detectCommand, levenshtein, matchPlayerName, matchesAnswer, nextHeard, normalize } from './text.ts';
+import { containsPhrase, countMagicWords, detectCommand, levenshtein, matchPlayerName, matchesAnswer, nextHeard, normalize } from './text.ts';
 
 test('normalize tira acento, pontuação e caixa', () => {
   assert.equal(normalize('  Pão-de-Queijo!! É bom, né? '), 'pao de queijo e bom ne');
@@ -24,7 +24,7 @@ test('palavra mágica tolera pequenos erros e ignora conversa comum', () => {
   assert.equal(detectCommand('pistachi', false), 'advance');
   assert.equal(detectCommand('pistache', false), 'advance');
   assert.equal(detectCommand('vida de cachorro', false), null);
-  assert.equal(detectCommand('dicas demais', false), null);
+  assert.equal(detectCommand('pistas demais', false), null);
   assert.equal(detectCommand('pistão', false), null);
   assert.equal(detectCommand('pizza de queijo', false), null);
 });
@@ -42,12 +42,12 @@ test('palavras curtas não aceitam erro (evita falso acerto)', () => {
   assert.ok(containsPhrase('é o rio', 'rio'));
 });
 
-test('"dica" avança a dica, mas só com o jogo rodando e só a palavra exata', () => {
-  assert.equal(detectCommand('próxima dica', false), 'advance');
-  assert.equal(detectCommand('DICA!', false), 'advance');
-  assert.equal(detectCommand('dica', true), null);
+test('"pista" avança a pista, mas só com o jogo rodando e só a palavra exata', () => {
+  assert.equal(detectCommand('próxima pista', false), 'advance');
+  assert.equal(detectCommand('PISTA!', false), 'advance');
+  assert.equal(detectCommand('pista', true), null);
   assert.equal(detectCommand('dita', false), null);
-  assert.equal(detectCommand('pistache dica pausa', false), 'advance');
+  assert.equal(detectCommand('pistache pista pausa', false), 'advance');
 });
 
 const jogadores = [
@@ -85,4 +85,11 @@ test('últimas 2 palavras ditas: parcial só aparece, final fica guardado', () =
   assert.deepEqual(h.done, ['um', 'gato']);
   h = nextHeard(h, 'não', false);
   assert.equal(h.shown, 'gato não');
+});
+
+test('countMagicWords conta cada aparição da palavra mágica', () => {
+  assert.equal(countMagicWords('conversa normal'), 0);
+  assert.equal(countMagicWords('Pistache'), 1);
+  assert.equal(countMagicWords('pistache ... pistachi, pista'), 3);
+  assert.equal(countMagicWords('pistache pausa'), 1);
 });

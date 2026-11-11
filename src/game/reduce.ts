@@ -102,6 +102,12 @@ export function reduce(state: GameState, event: GameEvent): GameState {
     const base: GameState = { ...undo.snapshot, undo: null };
     return reduce(base, undo.kind === 'correct' ? { type: 'CORRECT', playerId: event.playerId } : { type: 'CLOSEST', playerId: event.playerId });
   }
+  if (event.type === 'DISCARD') {
+    // Depois de pontuar, primeiro desfaz a pontuação (e o efeito da casa); depois pula a carta sem pontos para ninguém.
+    const base: GameState = (state.phase === 'roundEnd' || state.phase === 'finished') && state.undo ? { ...state.undo.snapshot, undo: null } : state;
+    if (base.phase !== 'clue' && base.phase !== 'noWinner') return state;
+    return skipCard(base);
+  }
   const next = step(state, event);
   if ((event.type === 'CORRECT' || event.type === 'CLOSEST') && next !== state) {
     const { undo: _old, ...snapshot } = state;
@@ -161,8 +167,27 @@ function step(state: GameState, event: GameEvent): GameState {
         lastResult: null,
       };
     }
-    case 'FIX_WINNER': return state;
+    case 'FIX_WINNER':
+    case 'DISCARD': return state;
   }
+}
+
+/** Pula a carta atual sem pontos: a mesma passagem de NEXT_ROUND, mas partindo de uma carta ainda em jogo. */
+function skipCard(state: GameState): GameState {
+  const next = state.cardIndex + 1;
+  if (next >= state.cards.length) {
+    return { ...state, phase: 'finished', winnerIds: leadersOf(state.players).map((p) => p.id), lastResult: null, undo: null };
+  }
+  return {
+    ...state,
+    phase: 'clue',
+    cardIndex: next,
+    clue: 1,
+    muted: state.players.filter((p) => p.muteNext).map((p) => p.id),
+    players: state.players.map((p) => ({ ...p, muteNext: false })),
+    lastResult: null,
+    undo: null,
+  };
 }
 
 export const currentCard = (state: GameState) => state.cards[state.cardIndex];
