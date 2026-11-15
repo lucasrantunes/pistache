@@ -24,29 +24,29 @@ export function levenshtein(a: string, b: string): number {
 }
 
 /** Erro tolerado por palavra, conforme o tamanho: curtas exatas, longas aceitam pequenos erros. */
-function tolerance(len: number): number {
+function tolerance(len: number, extra: number): number {
   if (len <= 3) return 0;
-  if (len <= 6) return 1;
-  return 2;
+  return (len <= 6 ? 1 : 2) + extra;
 }
 
-export function similarWord(heard: string, wanted: string): boolean {
-  return levenshtein(heard, wanted) <= tolerance(wanted.length);
+/** `extra` = erros a mais tolerados por palavra (só para teste; palavras de até 3 letras continuam exatas). */
+export function similarWord(heard: string, wanted: string, extra = 0): boolean {
+  return levenshtein(heard, wanted) <= tolerance(wanted.length, extra);
 }
 
 /** A frase aparece no texto, em palavras inteiras seguidas (com pequena tolerância por palavra). */
-export function containsPhrase(transcript: string, phrase: string): boolean {
+export function containsPhrase(transcript: string, phrase: string, extra = 0): boolean {
   const words = normalize(transcript).split(' ').filter(Boolean);
   const target = normalize(phrase).split(' ').filter(Boolean);
   if (target.length === 0 || words.length < target.length) return false;
   for (let i = 0; i <= words.length - target.length; i++) {
-    if (target.every((t, k) => similarWord(words[i + k], t))) return true;
+    if (target.every((t, k) => similarWord(words[i + k], t, extra))) return true;
   }
   return false;
 }
 
-export function matchesAnswer(transcript: string, answer: string, aliases: string[] = []): boolean {
-  return [answer, ...aliases].some((candidate) => containsPhrase(transcript, candidate));
+export function matchesAnswer(transcript: string, answer: string, aliases: string[] = [], extra = 0): boolean {
+  return [answer, ...aliases].some((candidate) => containsPhrase(transcript, candidate, extra));
 }
 
 export type VoiceCommand = 'advance' | 'pause' | 'resume';
@@ -57,12 +57,12 @@ const MAGIC = 'pistache';
  * "Pistache" avança a pista. "Pistache, pausa" pausa. Com o jogo pausado, "Pistache" retoma.
  * A palavra "pista" (exata, sem tolerância) também avança, mas só com o jogo rodando.
  */
-export function detectCommand(transcript: string, paused: boolean): VoiceCommand | null {
+export function detectCommand(transcript: string, paused: boolean, extra = 0): VoiceCommand | null {
   const words = normalize(transcript).split(' ').filter(Boolean);
-  const at = words.findIndex((w) => similarWord(w, MAGIC));
+  const at = words.findIndex((w) => similarWord(w, MAGIC, extra));
   if (at < 0) return !paused && words.includes('pista') ? 'advance' : null;
   const next = words[at + 1];
-  const saidPause = next !== undefined && similarWord(next, 'pausa');
+  const saidPause = next !== undefined && similarWord(next, 'pausa', extra);
   if (paused) return saidPause ? null : 'resume';
   return saidPause ? 'pause' : 'advance';
 }
@@ -114,8 +114,8 @@ export function nextHeard(prev: HeardWords, text: string, isFinal: boolean, coun
 }
 
 /** Quantas vezes a palavra mágica ("Pistache", ou "pista" exata) aparece no texto. */
-export function countMagicWords(transcript: string): number {
+export function countMagicWords(transcript: string, extra = 0): number {
   return normalize(transcript)
     .split(' ')
-    .filter((w) => w !== '' && (similarWord(w, MAGIC) || w === 'pista')).length;
+    .filter((w) => w !== '' && (similarWord(w, MAGIC, extra) || w === 'pista')).length;
 }

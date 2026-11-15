@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 64 64"><g transform="translate(32 32) scale(1.12) translate(-32 -32.5)"><rect x="-200" y="-200" width="464" height="464" fill="#351f7b"/><path d="M13 12a8 8 0 0 1 8-8h22a8 8 0 0 1 8 8v23a8 8 0 0 1-8 8H28l-12 10 4-10h-7a8 8 0 0 1-8-8V12Z" transform="translate(4 4)" fill="#b995ff"/><g transform="translate(28.5 26) scale(0.042) translate(-512 -560)">
+  <clipPath id="cl"><path d="M0 0 L512 0 L512 200 C 470 400 560 660 512 870 L512 1024 L0 1024 Z"/></clipPath>
+  <g transform="rotate(-10 512 870)"><g clip-path="url(#cl)"><ellipse cx="512" cy="545" rx="225" ry="335" fill="#ffca4b"/></g></g><clipPath id="cr"><path d="M1024 0 L512 0 L512 200 C 470 400 560 660 512 870 L512 1024 L1024 1024 Z"/></clipPath>
+  <g transform="rotate(10 512 870)"><g clip-path="url(#cr)"><ellipse cx="512" cy="545" rx="225" ry="335" fill="#ffca4b"/></g></g>
+  <ellipse cx="512" cy="590" rx="166" ry="250" fill="#b995ff"/>
+  <ellipse cx="512" cy="590" rx="138" ry="222" fill="#39e58c"/>
+  <ellipse cx="462" cy="500" rx="26" ry="85" fill="#fff" opacity=".4" transform="rotate(10 462 500)"/></g><circle cx="47.5" cy="38" r="5.2" fill="#ffca4b" stroke="#d2a8ff" stroke-width="2"/></g></svg>

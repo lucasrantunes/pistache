@@ -18,7 +18,34 @@ export type NativeOptions = {
   onDevice: boolean;
   /** Palavras que o sistema deve favorecer (ex.: "Pistache"). Vazio = sem dicas. */
   hints: string[];
+  /** Quantas hipóteses de texto pedir ao aparelho (1 a 5). */
+  alternatives?: number;
+  /** iPhone: tipo de tarefa. "confirmation" é indicado para palavras soltas e frases curtas. */
+  iosTaskHint?: 'unspecified' | 'confirmation' | 'search' | 'dictation';
+  /** iPhone: modo da sessão de áudio. "measurement" é o padrão da biblioteca (menos processamento do sistema). */
+  iosAudioMode?: 'measurement' | 'default' | 'voiceChat' | 'videoChat';
+  /** iPhone: processamento extra do áudio de entrada (pode trocar o modo para voiceChat e baixar o volume do som). */
+  iosVoiceProcessing?: boolean;
+  /** Android: modelo de linguagem "web_search" (melhor para palavras soltas) no lugar de "free_form". */
+  androidWebSearch?: boolean;
 };
+
+type StartOptions = Parameters<Lib['ExpoSpeechRecognitionModule']['start']>[0];
+
+/** Opções que só existem em uma das plataformas. */
+function platformOptions(options: NativeOptions): Partial<StartOptions> {
+  const o: Partial<StartOptions> = {};
+  if (Platform.OS === 'ios') {
+    if (options.iosTaskHint && options.iosTaskHint !== 'unspecified') o.iosTaskHint = options.iosTaskHint;
+    if (options.iosVoiceProcessing) o.iosVoiceProcessingEnabled = true;
+    if (options.iosAudioMode && options.iosAudioMode !== 'measurement') {
+      o.iosCategory = { category: 'playAndRecord', categoryOptions: ['defaultToSpeaker', 'allowBluetooth'], mode: options.iosAudioMode };
+    }
+  } else if (options.androidWebSearch) {
+    o.androidIntentOptions = { EXTRA_LANGUAGE_MODEL: 'web_search' };
+  }
+  return o;
+}
 
 type Lib = typeof import('expo-speech-recognition');
 type Subscription = { remove: () => void };
@@ -66,10 +93,11 @@ export function createNativeEngine(h: EngineHandlers, options: NativeOptions): V
         lang: 'pt-BR',
         interimResults: true,
         continuous: true,
-        maxAlternatives: 1,
+        maxAlternatives: Math.min(5, Math.max(1, options.alternatives ?? 1)),
         addsPunctuation: false,
         requiresOnDeviceRecognition: options.onDevice,
         contextualStrings: options.hints.length > 0 ? options.hints : undefined,
+        ...platformOptions(options),
       });
     } catch (e) {
       void fatal(e instanceof Error ? e.message : String(e));
@@ -118,8 +146,8 @@ export function createNativeEngine(h: EngineHandlers, options: NativeOptions): V
         }
       }),
       M.addListener('result', (event) => {
-        const text = event.results[0]?.transcript?.trim();
-        if (text) h.onText(text, event.isFinal === true);
+        const alts = event.results.map((r) => r.transcript?.trim()).filter((t): t is string => !!t);
+        if (alts.length > 0) h.onText(alts[0], event.isFinal === true, alts.length > 1 ? alts : undefined);
       }),
       M.addListener('error', (event) => {
         const code = String(event.error);
@@ -164,6 +192,14 @@ export function createNativeEngine(h: EngineHandlers, options: NativeOptions): V
       { label: 'Idioma', value: 'pt-BR' },
       { label: 'Pedido ao sistema', value: options.onDevice ? 'só no aparelho (sem internet)' : 'padrão do sistema (pode usar a nuvem)' },
       { label: 'Dicas de vocabulário', value: options.hints.length > 0 ? options.hints.join(', ') : 'desligadas' },
+      { label: 'Hipóteses pedidas', value: String(Math.min(5, Math.max(1, options.alternatives ?? 1))) },
+      ...(Platform.OS === 'ios'
+        ? [
+            { label: 'iPhone: tipo de tarefa', value: options.iosTaskHint ?? 'unspecified' },
+            { label: 'iPhone: modo do áudio', value: `${options.iosAudioMode ?? 'measurement'}${options.iosAudioMode && options.iosAudioMode !== 'measurement' ? ' (playAndRecord)' : ' (padrão)'}` },
+            { label: 'iPhone: voz processada', value: options.iosVoiceProcessing ? 'ligada' : 'desligada' },
+          ]
+        : [{ label: 'Android: modelo de linguagem', value: options.androidWebSearch ? 'web_search' : 'free_form (padrão)' }]),
       { label: 'Reinício automático', value: Platform.OS === 'ios' ? `sim, a cada ${IOS_RESTART_MS / 1000} s e quando o sistema encerra` : 'sim, quando o sistema encerra' },
     ];
     let module: Lib['ExpoSpeechRecognitionModule'];

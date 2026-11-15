@@ -35,6 +35,7 @@ export default function Lobby() {
   const [room, setRoom] = useState(() => normalizeCode(params.room ?? saved.room));
   const [editing, setEditing] = useState<number | null>(null);
   const [intro, setIntro] = useState(!saved.seenIntro);
+  const [voiceEngine, setVoiceEngine] = useState<'deepgram' | 'native'>('deepgram'); // só em desenvolvimento
 
   const filled = names.map((n) => n.trim()).filter(Boolean);
   const repeated = new Set(filled.map(normalize)).size < filled.length;
@@ -49,7 +50,7 @@ export default function Lobby() {
     const clean = names.map((n) => n.trim()).filter(Boolean);
     const code = isValidCode(room) ? room : '';
     saveLobby({ names: clean, cats, goal, room: code, seenIntro: true });
-    router.push({ pathname: '/jogo', params: { names: JSON.stringify(clean), goal: String(goal), cats: JSON.stringify(cats), room: code } } as never);
+    router.push({ pathname: '/jogo', params: { names: JSON.stringify(clean), goal: String(goal), cats: JSON.stringify(cats), room: code, ...(__DEV__ && voiceEngine === 'native' ? { voice: 'native' } : {}) } } as never);
   };
 
   if (intro) {
@@ -144,6 +145,16 @@ export default function Lobby() {
 
       <Btn label="Começar partida" onPress={play} disabled={!ready} />
       <T size={12} color={C.muted} style={{ textAlign: 'center' }}>O microfone fica ligado na partida. Nada é gravado.</T>
+      {__DEV__ ? (
+        <Pressable accessibilityRole="button" onPress={() => setVoiceEngine(voiceEngine === 'native' ? 'deepgram' : 'native')} style={{ alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 14 }}>
+          <T font="heavy" size={13} color={voiceEngine === 'native' ? C.yellow : C.lavender}>Voz do jogo: {voiceEngine === 'native' ? 'DO APARELHO' : 'Deepgram'} (tocar para trocar)</T>
+        </Pressable>
+      ) : null}
+      {__DEV__ ? (
+        <Pressable accessibilityRole="button" onPress={() => router.push('/voz' as never)} style={{ alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 14 }}>
+          <T font="heavy" size={13} color={C.lavender}>Teste de voz (só no desenvolvimento)</T>
+        </Pressable>
+      ) : null}
     </Screen>
   );
 }

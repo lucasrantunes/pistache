@@ -93,3 +93,16 @@ test('countMagicWords conta cada aparição da palavra mágica', () => {
   assert.equal(countMagicWords('pistache ... pistachi, pista'), 3);
   assert.equal(countMagicWords('pistache pausa'), 1);
 });
+
+test('tolerância extra aceita mais variações, mas palavras curtas continuam exatas', () => {
+  // "pistaxe" tem 1 erro; "pitaxe" tem 3 de distância de "pistache" (passa só com +1)
+  assert.equal(detectCommand('pitaxe', false), null);
+  assert.equal(detectCommand('pitaxe', false, 1), 'advance');
+  assert.equal(countMagicWords('pitaxe', 0), 0);
+  assert.equal(countMagicWords('pitaxe', 1), 1);
+  assert.equal(containsPhrase('o sol', 'sal', 2), false);
+  assert.equal(containsPhrase('fome', 'fomi', 0), true);
+  assert.equal(matchesAnswer('chocolate quente', 'chocolat', [], 0), true);
+  assert.equal(matchesAnswer('cucalate', 'chocolate', [], 0), false);
+  assert.equal(matchesAnswer('cucalate', 'chocolate', [], 1), true);
+});

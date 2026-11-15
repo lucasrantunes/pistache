@@ -44,7 +44,7 @@ const kindOf = (k: string): SpecialKind => (k === 'dobro' || k === 'ladrao' || k
 
 export default function Jogo() {
   useKeepAwake('pistache-partida'); // a tela do celular não apaga durante a partida
-  const params = useLocalSearchParams<{ names?: string; goal?: string; room?: string; cats?: string }>();
+  const params = useLocalSearchParams<{ names?: string; goal?: string; room?: string; cats?: string; voice?: string }>();
   const cats = useMemo(() => parseCats(params.cats), [params.cats]);
   const [state, dispatch] = useReducer(reduce, params, (p) => {
     let names: string[] = [];
@@ -142,7 +142,7 @@ export default function Jogo() {
     else if (cmd === 'pause') setPaused(true);
     else if (cmd === 'resume') setPaused(false);
     else if (!pausedRef.current && !nameIn()) addGuess(text); // fala final que não é resposta nem comando: palpite errado
-  });
+  }, __DEV__ && params.voice === 'native' ? 'native' : 'deepgram');
   const { start: startVoice, stop: stopVoice } = voice;
 
   // "Jogar sem microfone": a voz é fechada e não volta a tentar (nem a dar erro) até o fim da partida.
@@ -322,7 +322,7 @@ export default function Jogo() {
   const mic = { out: micOut, onPlayWithout: () => setNoMic(true) };
   const voiceLine =
     noMic ? 'Sem microfone · use os botões'
-      : voice.status === 'on' ? (paused ? 'Pausado' : 'Ouvindo a sala')
+      : voice.status === 'on' ? (paused ? 'Pausado' : 'Ouvindo a sala') + (__DEV__ && params.voice === 'native' ? ' · voz do aparelho' : '')
       : voice.status === 'connecting' ? 'Conectando o microfone…'
       : voice.status === 'error' ? `Sem voz (${voice.error}). Use os botões.`
       : 'Microfone desligado';

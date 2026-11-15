@@ -1,0 +1,49 @@
+name: Release iPhone (.ipa)
+
+# Para compilar: git push -f origin HEAD:release-ios
+on:
+  push:
+    branches: [release-ios]
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Gerar projeto iOS
+        run: npx expo prebuild --platform ios
+
+      - name: Compilar (Release, sem assinatura)
+        run: |
+          xcodebuild \
+            -workspace ios/pistache.xcworkspace \
+            -scheme pistache \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            | tail -n 40
+
+      - name: Empacotar .ipa
+        run: |
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/pistache.app Payload/
+          zip -qr pistache-release.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pistache-release-ipa
+          path: pistache-release.ipa
+          retention-days: 14

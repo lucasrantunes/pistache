@@ -20,8 +20,9 @@ export type EngineStats = {
 
 export type EngineHandlers = {
   onStatus: (status: EngineStatus) => void;
-  /** Texto entendido. Parcial enquanto a pessoa ainda fala; final quando o motor fecha a frase. */
-  onText: (text: string, isFinal: boolean) => void;
+  /** Texto entendido. Parcial enquanto a pessoa ainda fala; final quando o motor fecha a frase.
+   *  `alternatives` (só o motor nativo, se pedido) traz as outras hipóteses do aparelho, a primeira é o próprio texto. */
+  onText: (text: string, isFinal: boolean, alternatives?: string[]) => void;
   onError: (message: string) => void;
   /** Aviso sem gravidade para o registro (reinício, silêncio...). */
   onNote: (message: string) => void;
