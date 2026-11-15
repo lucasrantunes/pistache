@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Pistache",
+    "name": "pistache",
     "slug": "pistache",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,7 +9,11 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/images/icon.png",
-      "bundleIdentifier": "com.lucasrantunes.pistache"
+      "bundleIdentifier": "com.lucasrantunes.pistache",
+      "infoPlist": {
+        "CFBundleDisplayName": "Pistache",
+        "CFBundleName": "Pistache"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,6 +26,8 @@
       "package": "com.lucasrantunes.pistache"
     },
     "web": {
+      "name": "Pistache",
+      "shortName": "Pistache",
       "output": "single",
       "favicon": "./assets/images/favicon.png"
     },

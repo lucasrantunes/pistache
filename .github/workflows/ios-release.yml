@@ -27,6 +27,7 @@ jobs:
 
       - name: Compilar (Release, sem assinatura)
         run: |
+          set -o pipefail
           xcodebuild \
             -workspace ios/pistache.xcworkspace \
             -scheme pistache \
